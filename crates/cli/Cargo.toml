@@ -1,0 +1,33 @@
+[package]
+name = "ripcloc"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Counts lines of code by language, split into source and tests"
+readme = "../../README.md"
+
+[[bin]]
+name = "ripcloc"
+path = "src/main.rs"
+
+[dependencies]
+clap = { version = "4", features = ["derive"] }
+serde_json = "1"
+toml = "0.8"
+anyhow = "1"
+ignore = "0.4"
+globset = "0.4"
+regex = "1"
+serde_yaml = "0.9"
+
+[dev-dependencies]
+assert_cmd = "2"
+tempfile = "3"
+yare = "3"
+
+[[test]]
+name = "cli"
+path = "../../tests/cli.rs"
+
+[lints]
+workspace = true
