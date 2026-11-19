@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 Alfred Jean LLC
 
-//! `ripcloc`, which counts lines of code by language, split into source and tests.
+//! `ripcloc`, which quickly counts lines of code by language.
 
 mod cfg_test;
 mod cloc;
@@ -23,7 +23,7 @@ use cloc::LineCounts;
 use lang::Classifier;
 use project::Resolver;
 
-/// Counts lines of code by language, split into source and tests
+/// Quickly counts lines of code by language
 #[derive(Parser)]
 #[command(version, about)]
 struct Args {

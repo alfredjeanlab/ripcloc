@@ -1,6 +1,6 @@
 # ripcloc
 
-Counts lines of code by language, split into source and tests. There is no configuration; everything is detected.
+Quickly counts lines of code by language.
 
     make check    # fmt, clippy with warnings denied, and every test
 

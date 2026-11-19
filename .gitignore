@@ -1,4 +1,5 @@
 .DS_Store
+.idea/
 /target/
 /tests/fixtures/*/target/
 /tests/fixtures/*/Cargo.lock

@@ -3,8 +3,11 @@ name = "ripcloc"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
-description = "Counts lines of code by language, split into source and tests"
+description = "Quickly counts lines of code by language"
 readme = "../../README.md"
+repository = "https://github.com/alfredjeanlab/ripcloc"
+keywords = ["cloc", "sloc", "lines-of-code"]
+categories = ["command-line-utilities", "development-tools"]
 
 [dependencies]
 anyhow = "1"

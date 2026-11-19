@@ -1,8 +1,8 @@
 # ripcloc
 
-ripcloc counts lines of code, and tells you how much of it is tests.
+ripcloc quickly counts lines of code by language.
 
-It finds projects by manifest (e.g. `Cargo.toml` or `package.json`) and follows that language's or framework's conventions.
+It finds projects by manifest (e.g. `Cargo.toml` or `package.json`) and understands each language and framework's conventions.
 It is generally faster than similar tools, often two or three times faster on large repositories (and more than 100x faster than `cloc`).
 
 Here it is on its own repository:
@@ -57,8 +57,11 @@ So `--depth 2` also lists the packages of a workspace inside a top-level directo
 ## Installation
 
 ```
-cargo install --git https://github.com/alfredjeanlab/ripcloc
+brew install alfredjeanlab/tap/ripcloc
+cargo install ripcloc
 ```
+
+Binaries for Linux and macOS are on the [releases page](https://github.com/alfredjeanlab/ripcloc/releases).
 
 ## Usage
 
