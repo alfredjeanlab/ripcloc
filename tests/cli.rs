@@ -45,7 +45,7 @@ fn cloc_json(dir: &Path) -> serde_json::Value {
 // Basic output
 // =============================================================================
 
-/// `ripcloc` produces a table with Language, files, blank, comment, code columns
+/// `ripcloc` produces a table with Language, files, lines, blank, comment, code columns
 #[test]
 fn produces_table_output() {
     let mut cmd = ripcloc();
@@ -56,6 +56,7 @@ fn produces_table_output() {
     // Should contain header columns
     assert!(stdout.contains("Language"), "should have Language column");
     assert!(stdout.contains("files"), "should have files column");
+    assert!(stdout.contains("lines"), "should have lines column");
     assert!(stdout.contains("blank"), "should have blank column");
     assert!(stdout.contains("comment"), "should have comment column");
     assert!(stdout.contains("code"), "should have code column");
@@ -249,8 +250,8 @@ fn depth_breaks_directories_down_into_packages() {
 
     let expanded = text(&["--depth", "2"]);
     assert_eq!(row(&expanded, "  engine ")[0], 3);
-    assert_eq!(row(&expanded, "    engine-a ")[3], 1);
-    assert_eq!(row(&expanded, "    engine-b ")[3], 2);
+    assert_eq!(row(&expanded, "    engine-a ")[4], 1);
+    assert_eq!(row(&expanded, "    engine-b ")[4], 2);
     assert_eq!(row(&expanded, "    \u{2026} ")[0], 1);
     assert_eq!(row(&expanded, "  \u{2026} ")[0], 1);
 
@@ -286,6 +287,38 @@ fn counts_several_paths_once() {
     assert_eq!(language(&json, "TOML", "other")["comment"], 1);
 }
 
+/// A file given as a path is counted as it is when its directory is the path
+#[test]
+fn counts_a_file_as_its_directory() {
+    let temp = tree(&[
+        ("Cargo.toml", "[package]\nname = \"a\"\n"),
+        ("src/lib.rs", "fn a() {}\n#[cfg(test)]\nmod tests {\n}\n"),
+    ]);
+    let count = |path: &str| {
+        let output =
+            ripcloc().args(["-o", "json", path]).current_dir(temp.path()).output().unwrap();
+        serde_json::from_slice::<serde_json::Value>(&output.stdout).unwrap()
+    };
+    let json = count("src/lib.rs");
+    assert_eq!(json, count("src"));
+    assert_eq!(language(&json, "Rust", "test")["code"], 3);
+}
+
+/// A symlink found while walking is not followed, so its target is not counted twice, but a
+/// symlink given as a path is counted
+#[cfg(unix)]
+#[test]
+fn does_not_follow_symlinks_while_walking() {
+    let temp = tree(&[("real/x.py", "x = 1\n")]);
+    std::os::unix::fs::symlink(temp.path().join("real"), temp.path().join("link")).unwrap();
+    std::os::unix::fs::symlink(temp.path().join("real/x.py"), temp.path().join("y.py")).unwrap();
+    let json = cloc_json(temp.path());
+    assert_eq!(json["totals"]["total"]["files"], 1);
+    let output = ripcloc().args(["-o", "json", "link"]).current_dir(temp.path()).output().unwrap();
+    let json: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
+    assert_eq!(json["totals"]["total"]["files"], 1);
+}
+
 /// Files over `--max-file-size` megabytes are skipped
 #[test]
 fn skips_files_over_max_file_size() {
@@ -299,6 +332,32 @@ fn skips_files_over_max_file_size() {
     };
     assert_eq!(count(&[]), 2);
     assert_eq!(count(&["--max-file-size", "1"]), 1);
+}
+
+/// Files over 1 GiB are skipped, `--no-large` skips files over 10 MB, and `--large` counts files of
+/// any size. The last of them wins, and `--max-file-size` overrides both.
+#[test]
+fn large_flags_set_the_size_limit() {
+    let temp = tree(&[("small.py", "x = 1\n")]);
+    std::fs::write(temp.path().join("big.py"), "y = 2\n".repeat(2_000_000)).unwrap();
+    // A sparse file is over 1 GiB without taking the space, and is skipped without being read.
+    let huge = std::fs::File::create(temp.path().join("huge.py")).unwrap();
+    huge.set_len((1 << 30) + 1).unwrap();
+    let count = |args: &[&str]| {
+        let output =
+            ripcloc().args(args).args(["-o", "json"]).current_dir(temp.path()).output().unwrap();
+        assert!(output.status.success());
+        let json: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
+        json["totals"]["total"]["files"].as_u64().unwrap()
+    };
+    assert_eq!(count(&[]), 2);
+    assert_eq!(count(&["--no-large"]), 1);
+    assert_eq!(count(&["--large", "--no-large"]), 1);
+    assert_eq!(count(&["--no-large", "--max-file-size", "100"]), 2);
+    assert_eq!(count(&["--large", "--max-file-size", "1"]), 1);
+    // `--large` would read the sparse file, so it is removed first.
+    std::fs::remove_file(temp.path().join("huge.py")).unwrap();
+    assert_eq!(count(&["--no-large", "--large"]), 2);
 }
 
 /// Documentation, configuration and build files have one row, wherever they are
@@ -428,4 +487,142 @@ fn auto_detect_workspace_packages() {
         .collect();
     assert!(pkg_names.contains(&"alpha".to_string()), "should have alpha package");
     assert!(pkg_names.contains(&"beta".to_string()), "should have beta package");
+}
+
+/// A Rust source file with an inline test module is one source file, and the lines of the module,
+/// exactly, are tests
+#[test]
+fn inline_tests_move_lines_but_not_the_file() {
+    let temp = tree(&[(
+        "lib.rs",
+        "pub fn a() {}\n\n#[cfg(test)]\nmod tests {\n    #[test]\n    fn t() {}\n}\n",
+    )]);
+    let output =
+        ripcloc().args(["-o", "json", "lib.rs"]).current_dir(temp.path()).output().unwrap();
+    assert!(output.status.success());
+    let json: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
+    let (source, test) = (language(&json, "Rust", "source"), language(&json, "Rust", "test"));
+    assert_eq!(
+        (source["files"].clone(), source["blank"].clone(), source["code"].clone()),
+        (1.into(), 1.into(), 1.into())
+    );
+    assert_eq!(
+        (test["files"].clone(), test["blank"].clone(), test["code"].clone()),
+        (0.into(), 0.into(), 5.into())
+    );
+    assert_eq!(json["totals"]["total"]["files"], 1);
+
+    let output = ripcloc().arg("lib.rs").env("NO_COLOR", "1").current_dir(temp.path()).output();
+    let text = String::from_utf8(output.unwrap().stdout).unwrap();
+    let total = text.lines().find(|l| l.starts_with("Total ")).unwrap();
+    assert_eq!(total.split_whitespace().nth(1), Some("1"), "{text}");
+}
+
+/// `--no-ignore` counts what ignore files leave out, and the last of it and `--ignore` wins
+#[test]
+fn no_ignore_counts_ignored_files() {
+    let temp = tree(&[
+        (".ignore", "skipped.rs\n"),
+        ("kept.rs", "fn a() {}\n"),
+        ("skipped.rs", "fn b() {}\n"),
+    ]);
+    let files = |args: &[&str]| {
+        let output = ripcloc().args(["-o", "json"]).args(args).current_dir(temp.path()).output();
+        let json: serde_json::Value = serde_json::from_slice(&output.unwrap().stdout).unwrap();
+        json["totals"]["total"]["files"].as_u64().unwrap()
+    };
+    assert_eq!(files(&[]), 1);
+    assert_eq!(files(&["--no-ignore"]), 2);
+    assert_eq!(files(&["--no-ignore", "--ignore"]), 1);
+}
+
+// =============================================================================
+// --no-attribution
+// =============================================================================
+
+fn mixed_tree() -> tempfile::TempDir {
+    tree(&[
+        ("Cargo.toml", "[workspace]\nmembers = [\"a\", \"b\"]\n"),
+        ("a/Cargo.toml", "[package]\nname = \"a\"\n"),
+        ("a/src/lib.rs", "pub fn a() {}\n\n#[cfg(test)]\nmod tests {\n    fn t() {}\n}\n"),
+        ("a/tests/t.rs", "fn t() {}\n"),
+        ("b/Cargo.toml", "[package]\nname = \"b\"\n"),
+        ("b/src/lib.rs", "// b\npub fn b() {}\n"),
+        ("README.md", "# x\n"),
+    ])
+}
+
+/// Every row and total has `lines`, the sum of its blank, comment and code lines, and the report
+/// says which schema it follows.
+#[test]
+fn json_has_lines_and_a_schema() {
+    let json = cloc_json(mixed_tree().path());
+    assert_eq!(json["schema"], 1);
+    let rows = json["languages"].as_array().unwrap().iter();
+    let totals = json["totals"].as_object().unwrap().values();
+    for stats in rows.chain(totals) {
+        let sum =
+            ["blank", "comment", "code"].map(|k| stats[k].as_u64().unwrap()).iter().sum::<u64>();
+        assert_eq!(stats["lines"].as_u64(), Some(sum), "{stats}");
+    }
+}
+
+/// With `--no-attribution`, each language is one row of kind `code`, and the totals are of code and
+/// other formats
+#[test]
+fn no_attribution_counts_each_language_as_one_row() {
+    let temp = mixed_tree();
+    let output =
+        ripcloc().args(["-o", "json", "--no-attribution"]).current_dir(temp.path()).output();
+    let json: serde_json::Value = serde_json::from_slice(&output.unwrap().stdout).unwrap();
+    assert_eq!(json["attribution"], false);
+    let rust = language(&json, "Rust", "code");
+    assert_eq!(rust["files"], 3);
+    assert_eq!(rust["code"], 7);
+    assert_eq!(rust["comment"], 1);
+    let names: Vec<&str> =
+        rust["packages"].as_array().unwrap().iter().map(|p| p["name"].as_str().unwrap()).collect();
+    assert_eq!(names, ["a", "b"]);
+    let kinds = json["languages"].as_array().unwrap().iter().map(|l| l["kind"].as_str().unwrap());
+    assert!(kinds.into_iter().all(|k| k == "code" || k == "other"), "{json}");
+    assert_eq!(language(&json, "Markdown", "other")["files"], 1);
+
+    let totals = &json["totals"];
+    assert!(totals.get("source").is_none() && totals.get("test").is_none(), "{totals}");
+    assert_eq!(totals["code"]["files"], 3);
+    assert_eq!(totals["other"]["files"], 4);
+    assert_eq!(totals["total"]["files"], 7);
+
+    // Attribution counts the same files and lines, and says that it attributed them.
+    let attributed = cloc_json(temp.path());
+    assert_eq!(attributed["attribution"], true);
+    assert_eq!(attributed["totals"]["total"], json["totals"]["total"]);
+}
+
+/// Text rows have no `(source)` or `(tests)`, and the footer totals code and other formats apart
+/// only when there are both
+#[test]
+fn no_attribution_text_output() {
+    let temp = mixed_tree();
+    let text = |args: &[&str]| {
+        let output =
+            ripcloc().args(args).env("NO_COLOR", "1").current_dir(temp.path()).output().unwrap();
+        assert!(output.status.success());
+        String::from_utf8(output.stdout).unwrap()
+    };
+    let all = text(&["--no-attribution", "--depth", "1"]);
+    assert!(!all.contains("(source)") && !all.contains("(tests)"), "{all}");
+    assert!(!all.contains("Source total") && !all.contains("Test total"), "{all}");
+    assert!(all.lines().any(|l| l.starts_with("Rust ")), "{all}");
+    assert!(all.lines().any(|l| l.starts_with("  a ")), "{all}");
+    assert!(all.lines().any(|l| l.starts_with("Code total ")), "{all}");
+    assert!(all.lines().any(|l| l.starts_with("Other total ")), "{all}");
+
+    let code_only = text(&["--no-attribution", "a/src/lib.rs"]);
+    assert!(!code_only.contains("Code total") && !code_only.contains("Other total"), "{code_only}");
+    assert!(code_only.lines().any(|l| l.starts_with("Total ")), "{code_only}");
+
+    // The last of `--attribution` and `--no-attribution` wins.
+    assert!(text(&["--no-attribution", "--attribution"]).contains("Rust (tests)"));
+    assert!(!text(&["--attribution", "--no-attribution"]).contains("Rust (tests)"));
 }

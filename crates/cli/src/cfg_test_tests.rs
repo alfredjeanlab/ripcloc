@@ -798,7 +798,31 @@ struct Fixture {
 }
 
 #[test]
-fn split_lines_counts_nonblank_source_and_test_lines() {
-    let content = "fn a() {}\n\n#[cfg(test)]\nmod tests {\n    fn t() {}\n}\n";
-    assert_eq!(split_lines(content), (1, 4));
+fn test_ranges_run_from_the_attribute_to_the_closing_brace() {
+    let content = "fn a() {}\n\n#[cfg(test)]\nmod tests {\n\n    fn t() {}\n}\n";
+    assert_eq!(test_ranges(content.as_bytes()), vec![2..7]);
+}
+
+#[test]
+fn test_ranges_find_attributes_split_by_block_comments() {
+    let content = "#[c/* */fg(test)]\nmod tests {\n    fn t() {}\n}\n";
+    assert_eq!(test_ranges(content.as_bytes()), vec![0..4]);
+}
+
+#[test]
+fn test_ranges_start_at_the_first_line_of_a_multiline_attribute() {
+    let content = "fn a() {}\n#[cfg(\n\n    test\n)]\nmod tests {\n}\n";
+    assert_eq!(test_ranges(content.as_bytes()), vec![1..7]);
+}
+
+#[test]
+fn char_literals_are_found_by_character() {
+    let content = "#[cfg(test)]\nmod tests {\n    const C: [char; 2] = ['é', '}'];\n}\nfn a() {}\n";
+    assert_eq!(CfgTestInfo::parse(content).test_ranges, vec![0..4]);
+}
+
+#[test]
+fn counts_files_that_are_not_utf8() {
+    let content = b"#[cfg(test)]\nmod tests {\n    // \xff\n}\n";
+    assert_eq!(test_ranges(content), vec![0..4]);
 }

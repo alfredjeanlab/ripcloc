@@ -1,0 +1,51 @@
+#!/usr/bin/env bash
+# Fetches the corpora that bench/run measures into <corpora>, each at the commit or release that the published results
+# used, so that a rerun counts the same files.
+#
+#   bench/fetch <corpora>
+set -euo pipefail
+
+repo=$(git -C "$(dirname "$0")" rev-parse --show-toplevel)
+mkdir -p "$1"
+cd "$1"
+
+clone() {
+  local name=$1 url=$2 commit=$3
+  [ -d "$name" ] && return
+  git init -q "$name"
+  git -C "$name" fetch -q --depth 1 "$url" "$commit"
+  git -C "$name" checkout -q FETCH_HEAD
+}
+
+clone linux https://github.com/torvalds/linux 4405c18c95d2d0f99f6c581ef0ee8591a1aa6ccd &
+clone rust https://github.com/rust-lang/rust 65ce8611fed3142053320be6996ef00e9992671f &
+clone react https://github.com/facebook/react 63d9c806be677e9c2394696ca4a91f52e01eec6d &
+clone rails https://github.com/rails/rails 78f4f0df59866e8951646183c1f275e186916ba7 &
+clone ripgrep https://github.com/BurntSushi/ripgrep 4933645d81498e53ea150f96bde5860f6dcb2e5f &
+clone cloc https://github.com/AlDanial/cloc 414fe1617b75fa2847844295ac423180db9ca4ea &
+clone ripcloc "$repo" 26dfd29ea3dc3b43dd171bd7244dcf696e105480 &
+wait
+
+[ -d grep-3.12 ] || curl -sSfL https://ftp.gnu.org/gnu/grep/grep-3.12.tar.xz | tar xJ
+if [ ! -d sqlite-amalgamation-3500400 ]; then
+  curl -sSfLo sqlite.zip https://www.sqlite.org/2025/sqlite-amalgamation-3500400.zip
+  python3 -I -c 'import zipfile; zipfile.ZipFile("sqlite.zip").extractall(".")'
+  rm sqlite.zip
+fi
+if [ ! -d typescript-5.6.3 ]; then
+  mkdir typescript-5.6.3
+  curl -sSfLo typescript-5.6.3/checker.ts \
+    https://raw.githubusercontent.com/microsoft/TypeScript/v5.6.3/src/compiler/checker.ts
+fi
+# Copies of corpora with only the files that every tool counts the same, for benchmarks of equal work.
+only() {
+  local from=$1 to=$2
+  shift 2
+  [ -d "$to" ] && return
+  local includes=()
+  for pattern in "$@"; do includes+=(--include="$pattern"); done
+  rsync -a --include='*/' "${includes[@]}" --exclude='*' --prune-empty-dirs "$from/" "$to/"
+}
+only linux linux-ch '*.c' '*.h'
+only rust rust-rs '*.rs'
+only react react-js '*.js' '*.jsx' '*.ts' '*.tsx'

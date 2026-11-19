@@ -1,4 +1,4 @@
-/target/
 .DS_Store
+/target/
 /tests/fixtures/*/target/
 /tests/fixtures/*/Cargo.lock

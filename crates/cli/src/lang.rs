@@ -161,32 +161,42 @@ impl Language {
 /// Classifies paths as source or test.
 pub struct Classifier {
     language: Language,
-    tests: GlobSet,
-    generic_tests: GlobSet,
+    /// The language's test patterns, built on first use, since most runs see few languages.
+    tests: OnceLock<GlobSet>,
 }
 
 impl Classifier {
-    /// The classifier for `language`, built once.
+    /// The classifier for `language`.
     pub fn of(language: Language) -> &'static Self {
-        static ALL: OnceLock<Vec<Classifier>> = OnceLock::new();
-        let all = ALL.get_or_init(|| {
-            use Language::*;
-            [Rust, Go, JavaScript, Python, Ruby, Shell, Generic].map(Classifier::new).into()
-        });
-        &all[language as usize]
+        use Language::*;
+        static ALL: [Classifier; 7] = [
+            Classifier::new(Rust),
+            Classifier::new(Go),
+            Classifier::new(JavaScript),
+            Classifier::new(Python),
+            Classifier::new(Ruby),
+            Classifier::new(Shell),
+            Classifier::new(Generic),
+        ];
+        &ALL[language as usize]
     }
 
-    fn new(language: Language) -> Self {
-        Self { language, tests: glob_set(language.tests()), generic_tests: glob_set(GENERIC_TESTS) }
+    const fn new(language: Language) -> Self {
+        Self { language, tests: OnceLock::new() }
+    }
+
+    fn tests(&self) -> &GlobSet {
+        self.tests.get_or_init(|| glob_set(self.language.tests()))
     }
 
     /// Whether the path is a test, rather than source.
     pub fn is_test(&self, path: &Path) -> bool {
         let ext = path.extension().and_then(|e| e.to_str()).unwrap_or("");
         if self.language.extensions().contains(&ext) {
-            self.tests.is_match(path)
+            self.tests().is_match(path)
         } else {
-            self.generic_tests.is_match(path)
+            // The generic language's own tests are the generic ones.
+            Self::of(Language::Generic).tests().is_match(path)
         }
     }
 }

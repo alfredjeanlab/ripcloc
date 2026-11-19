@@ -404,6 +404,7 @@ dependencies = [
  "clap",
  "globset",
  "ignore",
+ "memchr",
  "regex",
  "serde_json",
  "serde_yaml",
