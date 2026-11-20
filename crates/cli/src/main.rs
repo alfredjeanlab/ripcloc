@@ -11,13 +11,13 @@ mod project;
 
 use std::collections::{BTreeMap, HashMap, HashSet};
 use std::fs::File;
-use std::io::{IsTerminal, Read};
+use std::io::Read;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex, PoisonError};
 
 use clap::{Parser, ValueEnum};
 use ignore::{WalkBuilder, WalkState};
-use serde_json::{Value, json};
+use serde_json::{Map, Value, json};
 
 use cloc::LineCounts;
 use lang::Classifier;
@@ -43,25 +43,25 @@ struct Args {
     depth: Option<usize>,
 
     /// Count files of any size. Without it, files over 1 GiB are skipped
-    #[arg(long, overrides_with = "no_large")]
+    #[arg(long, conflicts_with = "no_large")]
     large: bool,
 
     /// Skip files over 10 MB, such as generated code and data
-    #[arg(long, overrides_with = "large")]
+    #[arg(long, conflicts_with = "large")]
     no_large: bool,
 
-    /// Skip files larger than this many megabytes, whether or not `--large` or `--no-large` is
-    /// given
-    #[arg(long, value_name = "MB")]
+    /// Skip files larger than this many megabytes
+    #[arg(long, value_name = "MB", conflicts_with_all = ["large", "no_large"])]
     max_file_size: Option<u64>,
 
     /// Respect `.gitignore`, `.ignore` and git's exclude files [default]
-    #[arg(long, overrides_with = "no_ignore")]
+    #[arg(long, conflicts_with = "no_ignore")]
     ignore: bool,
 
     /// Count files that `.gitignore`, `.ignore` and git's exclude files leave out. Hidden files
-    /// and build and dependency directories are still skipped
-    #[arg(long, overrides_with = "ignore")]
+    /// are still skipped, and so are build and dependency directories, such as `target/` directly
+    /// inside a Rust project or any directory that holds a `pyvenv.cfg` or `CACHEDIR.TAG`
+    #[arg(long, conflicts_with = "ignore")]
     no_ignore: bool,
 
     /// Output format
@@ -69,11 +69,11 @@ struct Args {
     output: Format,
 
     /// Attribute each language's lines to source or tests [default]
-    #[arg(long, overrides_with = "no_attribution")]
+    #[arg(long, conflicts_with = "no_attribution")]
     attribution: bool,
 
     /// Count each language as one row, without telling source from tests, which is faster
-    #[arg(long, overrides_with = "attribution")]
+    #[arg(long, conflicts_with = "attribution")]
     no_attribution: bool,
 }
 
@@ -116,10 +116,17 @@ impl Stats {
         self.lines.add(other.lines);
     }
 
-    fn json(&self) -> Value {
+    fn json(&self) -> Map<String, Value> {
         let LineCounts { blank, comment, code } = self.lines;
         let lines = blank + comment + code;
-        json!({ "files": self.files, "lines": lines, "blank": blank, "comment": comment, "code": code })
+        let fields = [
+            ("files", self.files),
+            ("lines", lines),
+            ("blank", blank),
+            ("comment", comment),
+            ("code", code),
+        ];
+        fields.into_iter().map(|(key, count)| (key.to_string(), json!(count))).collect()
     }
 
     fn text(&self, label: &str, width: usize) -> String {
@@ -222,11 +229,13 @@ fn main() -> anyhow::Result<()> {
         .cloned()
         .collect();
     let types: Vec<_> = paths.iter().map(|p| std::fs::metadata(p).map(|m| m.file_type())).collect();
-    let is_dir = |i: usize| types[i].as_ref().is_ok_and(|t| t.is_dir());
-    let roots = paths
-        .iter()
-        .enumerate()
-        .map(|(i, p)| if is_dir(i) { p.clone() } else { p.parent().unwrap_or(p).to_path_buf() });
+    let roots = paths.iter().zip(&types).map(|(p, t)| {
+        if t.as_ref().is_ok_and(|t| t.is_dir()) {
+            p.clone()
+        } else {
+            p.parent().unwrap_or(p).to_path_buf()
+        }
+    });
     let resolver = Arc::new(Resolver::new(roots));
     const MB: u64 = 1024 * 1024;
     let max_bytes = match args.max_file_size {
@@ -272,25 +281,28 @@ fn main() -> anyhow::Result<()> {
                 .iter()
                 .map(|((name, kind), row)| {
                     let mut entry = row.stats.json();
-                    entry["language"] = json!(name);
-                    entry["kind"] = json!(match kind {
-                        Kind::Source => "source",
-                        Kind::Test => "test",
-                        Kind::Code => "code",
-                        Kind::Other => "other",
-                    });
+                    entry.insert("language".into(), json!(name));
+                    entry.insert(
+                        "kind".into(),
+                        json!(match kind {
+                            Kind::Source => "source",
+                            Kind::Test => "test",
+                            Kind::Code => "code",
+                            Kind::Other => "other",
+                        }),
+                    );
                     if row.packages.keys().any(|(_, name)| name.is_some()) {
                         let packages = row.packages.iter().map(|((group, name), stats)| {
                             let mut package = stats.json();
-                            package["name"] = json!(name.as_deref());
+                            package.insert("name".into(), json!(name.as_deref()));
                             if !group.is_empty() {
-                                package["project"] = json!(group.as_ref());
+                                package.insert("project".into(), json!(group.as_ref()));
                             }
                             package
                         });
-                        entry["packages"] = packages.collect();
+                        entry.insert("packages".into(), packages.collect());
                     }
-                    entry
+                    Value::Object(entry)
                 })
                 .collect();
             let totals = if args.no_attribution {
@@ -311,11 +323,7 @@ fn main() -> anyhow::Result<()> {
                 depth => depth.unwrap_or(1),
             };
             let depth = args.depth.unwrap_or(1);
-            let color = use_color();
-            let paint = |code: u8, text: &str| {
-                if color { format!("\x1b[38;5;{code}m{text}\x1b[0m") } else { text.to_string() }
-            };
-            // Each line is (depth, label, stats, whether it breaks down the row above it).
+            // Each line is (depth, label, stats).
             let mut lines = Vec::new();
             // Source is only called source when the language has tests to tell it from.
             let has_tests = |name: &str| rows.contains_key(&(name.to_string(), Kind::Test));
@@ -325,26 +333,26 @@ fn main() -> anyhow::Result<()> {
                     Kind::Test => format!("{name} (tests)"),
                     Kind::Source | Kind::Code | Kind::Other => name.clone(),
                 };
-                lines.push((0, label, row.stats, false));
+                lines.push((0, label, row.stats));
                 let parts = match kind {
                     Kind::Other => row.breakdown(other_depth, false),
                     Kind::Source | Kind::Test | Kind::Code => row.breakdown(depth, true),
                 };
-                lines.extend(parts.into_iter().map(|(d, l, s)| (d, l.to_string(), s, true)));
+                lines.extend(parts.into_iter().map(|(d, l, s)| (d, l.to_string(), s)));
             }
             // The label column is wide enough for the longest label, and at least 25.
             let width =
                 lines.iter().map(|(d, l, ..)| 2 * d + l.chars().count()).fold(25, usize::max);
-            let rule = paint(245, &"\u{2500}".repeat(width + 47));
+            let rule = "\u{2500}".repeat(width + 47);
             let header = format!(
                 "{:<width$} {:>5}  {:>8}  {:>8}  {:>8}  {:>8}",
                 "Language", "files", "lines", "blank", "comment", "code"
             );
-            println!("{rule}\n{}\n{rule}", paint(74, &header));
-            for (depth, label, stats, is_part) in &lines {
+            println!("{rule}\n{header}\n{rule}");
+            for (depth, label, stats) in &lines {
                 let indent = "  ".repeat(*depth);
                 let line = format!("{indent}{}", stats.text(label, width - indent.len()));
-                println!("{}", if *is_part { paint(250, &line) } else { line });
+                println!("{line}");
             }
             // Without attribution, code and other formats are only totaled apart when there are both.
             if !args.no_attribution {
@@ -390,9 +398,12 @@ fn walk(paths: &[PathBuf], args: &Args, resolver: &Arc<Resolver>, max_bytes: u64
         };
         let name = e.file_name().to_string_lossy();
         let context = filter_resolver.context(parent);
+        // The directory's own context is resolved last, since that reads it, which is wasted on a
+        // directory that its name already excludes.
         name != "node_modules"
-            && !context.language.excludes(&name)
-            && !context.root_language.excludes(&name)
+            && !context.language.excludes(&name, *context.project == *parent)
+            && !context.root_language.excludes(&name, *context.root == *parent)
+            && !filter_resolver.context(e.path()).generated
     });
 
     // Each thread counts into rows of its own, which are merged when the walk drops it.
@@ -447,14 +458,15 @@ fn sort_rows(rows: &Rows) -> Vec<(&(String, Kind), &Row)> {
     sorted.sort_by(|((a, a_kind), _), ((b, b_kind), _)| {
         (*a_kind == Kind::Other)
             .cmp(&(*b_kind == Kind::Other))
-            .then(code[b.as_str()].cmp(&code[a.as_str()]))
+            .then(code.get(b.as_str()).cmp(&code.get(a.as_str())))
             .then(a.cmp(b))
             .then(a_kind.cmp(b_kind))
     });
     sorted
 }
 
-/// Count one walked file into `rows`, if it is a file of a counted type and at most `max_bytes`.
+/// Count one walked file into `rows`, if it is a text file of a counted type and at most
+/// `max_bytes`.
 ///
 /// Without `attribute`, the file's language is one row, and no time is spent on telling tests apart.
 fn count_file(
@@ -465,11 +477,29 @@ fn count_file(
     rows: &mut Rows,
     buffer: &mut Vec<u8>,
 ) {
-    let key = cloc::file_key(path);
+    let mut key = cloc::file_key(path);
+    if key.is_empty() {
+        let Some(shebang) = shebang_key(path) else { return };
+        key = shebang.to_string();
+    }
     if !cloc::is_counted(&key) {
         return;
     }
+    // Skip an unreadable file quietly, since warnings would bury the report.
     let Some(content) = read(path, max_bytes, buffer) else { return };
+    let utf8;
+    let content = match decode_utf16(content) {
+        Some(text) => {
+            utf8 = text;
+            utf8.as_bytes()
+        }
+        None if is_binary(content) => return,
+        None => content,
+    };
+    // Coq and Verilog share the extension `.v`, so the content tells them apart.
+    if key == "v" {
+        key = cloc::v_key(content).to_string();
+    }
     let Some(context) = path.parent().map(|dir| resolver.context(dir)) else { return };
     let from = |base: &Path| path.strip_prefix(base).unwrap_or(path);
     // A test by the walked root's conventions stays a test inside a nested project, such as a
@@ -536,19 +566,44 @@ fn read<'a>(path: &Path, max_bytes: u64, buffer: &'a mut Vec<u8>) -> Option<&'a 
     Some(buffer)
 }
 
+/// The key of the file at `path` from its `#!` line, if it has one that names a known interpreter.
+///
+/// Only the start of the file is read, since most files without an extension are not scripts.
+fn shebang_key(path: &Path) -> Option<&'static str> {
+    let mut start = [0; SHEBANG_PREFIX];
+    let file = File::open(path).ok()?;
+    let len = file.take(SHEBANG_PREFIX as u64).read(&mut start).ok()?;
+    cloc::shebang_key(start.get(..len)?)
+}
+
+/// How many bytes at the start of a file without an extension are read for a `#!` line.
+const SHEBANG_PREFIX: usize = 128;
+
+/// Whether `content` looks like a binary file, which is not counted whatever its extension.
+///
+/// A NUL byte in the first [`BINARY_PREFIX`] bytes marks a binary file, as it does for git.
+fn is_binary(content: &[u8]) -> bool {
+    memchr::memchr(0, content.get(..BINARY_PREFIX).unwrap_or(content)).is_some()
+}
+
+/// The text of `content` in UTF-8, if `content` starts with a UTF-16 byte order mark.
+///
+/// UTF-16 text has NUL bytes, which would mark it as binary, and its line breaks and comment
+/// delimiters are two bytes wide, so it is decoded before it is counted. An unpaired surrogate
+/// becomes U+FFFD.
+fn decode_utf16(content: &[u8]) -> Option<String> {
+    let from_bytes = match content.get(..2)? {
+        [0xFF, 0xFE] => u16::from_le_bytes,
+        [0xFE, 0xFF] => u16::from_be_bytes,
+        _ => return None,
+    };
+    let (units, _) = content.as_chunks::<2>();
+    let chars = char::decode_utf16(units.iter().map(|&pair| from_bytes(pair)));
+    Some(chars.map(|c| c.unwrap_or(char::REPLACEMENT_CHARACTER)).collect())
+}
+
+/// How many bytes at the start of a file are searched for a NUL byte.
+const BINARY_PREFIX: usize = 8000;
+
 /// The most bytes that a reused read buffer keeps.
 const LARGE_BUFFER: usize = 16 * 1024 * 1024;
-
-/// Whether to color stdout.
-///
-/// `NO_COLOR` disables color and `COLOR` forces it, whatever their values. Otherwise color is
-/// used only on a terminal outside an agent or CI environment.
-fn use_color() -> bool {
-    let set = |name: &str| std::env::var_os(name).is_some();
-    if set("NO_COLOR") {
-        return false;
-    }
-    set("COLOR")
-        || (std::io::stdout().is_terminal()
-            && !["CLAUDE_CODE", "CODEX", "CURSOR", "CI"].into_iter().any(set))
-}

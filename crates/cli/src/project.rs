@@ -16,7 +16,7 @@ use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex, MutexGuard, PoisonError};
 
-use crate::lang::Language;
+use crate::lang::{self, Language};
 use crate::packages;
 
 /// The project and package of a directory.
@@ -36,6 +36,8 @@ pub struct Context {
     /// directory, then the name of each package that encloses it below that. One of the walked
     /// root's own packages takes the place of the top-level directory.
     pub chain: Arc<[Arc<str>]>,
+    /// Whether the directory holds a file that marks it as generated, such as a `pyvenv.cfg`.
+    pub generated: bool,
 }
 
 /// A package's name, and the group of the project that declares it.
@@ -72,9 +74,11 @@ impl Resolver {
             return Arc::clone(context);
         }
         let parent = dir.parent().filter(|_| !self.roots.contains(dir)).map(|p| self.context(p));
+        let names = lang::names(dir);
+        let generated = lang::is_generated(&names);
         let language = match &parent {
-            None => Some(Language::detect(dir)),
-            Some(_) => Language::detect_nested(dir),
+            None => Some(Language::detect(dir, &names)),
+            Some(_) => Language::detect_nested(&names),
         };
         let root: Arc<Path> = parent.as_ref().map_or_else(|| dir.into(), |p| Arc::clone(&p.root));
         let label: Arc<str> = dir.strip_prefix(&root).unwrap_or(dir).to_string_lossy().into();
@@ -127,6 +131,7 @@ impl Resolver {
                     package,
                     group,
                     chain,
+                    generated,
                 }
             }
             (Some(parent), language) => Context {
@@ -137,6 +142,7 @@ impl Resolver {
                 package,
                 group,
                 chain,
+                generated,
             },
         });
         Arc::clone(lock(&self.contexts).entry(dir.to_path_buf()).or_insert(context))
@@ -262,8 +268,16 @@ mod tests {
         let dir = monorepo();
         let resolver = Resolver::new([dir.path().to_path_buf()]);
         let engine = resolver.context(&dir.path().join("engine"));
-        assert!(engine.language.excludes("target"));
-        assert!(!engine.root_language.excludes("target"));
-        assert!(resolver.context(&dir.path().join("web")).language.excludes("dist"));
+        assert!(engine.language.excludes("target", true));
+        assert!(!engine.root_language.excludes("target", true));
+        assert!(resolver.context(&dir.path().join("web")).language.excludes("dist", true));
+    }
+
+    #[test]
+    fn a_marker_makes_a_directory_generated() {
+        let dir = tree(&["pyproject.toml", "env/pyvenv.cfg", "app/__init__.py"]);
+        let resolver = Resolver::new([dir.path().to_path_buf()]);
+        assert!(resolver.context(&dir.path().join("env")).generated);
+        assert!(!resolver.context(&dir.path().join("app")).generated);
     }
 }

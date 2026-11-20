@@ -1,4 +1,5 @@
-# Code in #[test] functions and #[cfg(test)] modules may panic, unwrap and expect.
+# Code in #[test] functions and #[cfg(test)] modules may panic, unwrap, expect and index.
 allow-panic-in-tests = true
 allow-unwrap-in-tests = true
 allow-expect-in-tests = true
+allow-indexing-slicing-in-tests = true

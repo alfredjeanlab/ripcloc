@@ -826,3 +826,60 @@ fn counts_files_that_are_not_utf8() {
     let content = b"#[cfg(test)]\nmod tests {\n    // \xff\n}\n";
     assert_eq!(test_ranges(content), vec![0..4]);
 }
+
+#[test]
+fn comment_openers_in_strings_do_not_hide_test_modules() {
+    let content = "fn source() {\n    let r = r#\"a \" /* b\"#;\n    let s = \"/* c\";\n    let u = \"http://x\"; {\n    }\n}\n\n#[cfg(test)]\nmod tests {\n    fn t() {}\n}\n";
+    let info = CfgTestInfo::parse(content);
+    assert_eq!(info.test_ranges, vec![7..11]);
+}
+
+#[test]
+fn multiline_strings_with_braces_do_not_hide_test_modules() {
+    let content = "fn source() {\n    let s = \"{\n  // }\n    }\";\n    let r = r#\"\n}\" {\n\"#;\n}\n\n#[cfg(test)]\nmod tests {\n    fn t() {}\n}\n";
+    assert_eq!(CfgTestInfo::parse(content).test_ranges, vec![9..13]);
+}
+
+#[test]
+fn multiline_strings_do_not_end_test_modules_early() {
+    let content = "#[cfg(test)]\nmod tests {\n    const S: &str = \"\n}\n/* \\\"\n}\";\n    const R: &str = r##\"\n}\"#\n\"##;\n}\nfn a() {}\n";
+    assert_eq!(CfgTestInfo::parse(content).test_ranges, vec![0..10]);
+}
+
+#[test]
+fn attributes_inside_multiline_strings_are_not_detected() {
+    let content = "const DOC: &str = \"\n#[cfg(test)]\nmod tests {\n}\n\";\nfn a() {}\n";
+    assert!(CfgTestInfo::parse(content).test_ranges.is_empty());
+    let content = "const DOC: &str = r#\"\n#[cfg(test)]\nmod tests {\n\"#;\nfn a() {}\n";
+    assert!(CfgTestInfo::parse(content).test_ranges.is_empty());
+}
+
+#[test]
+fn quotes_in_comments_and_characters_do_not_open_strings() {
+    let content = "// don't \"\nfn a() { let c = '\"'; } /* \" */\n\n#[cfg(test)]\nmod tests {\n    fn t<'a>() {} // \"\n}\n";
+    assert_eq!(CfgTestInfo::parse(content).test_ranges, vec![3..7]);
+}
+
+#[test]
+fn escaped_backslash_ends_a_string_before_a_brace() {
+    let content = "#[cfg(test)]\nmod tests {\n    const S: &str = \"\\\\\"; }\nfn a() {}\n";
+    assert_eq!(CfgTestInfo::parse(content).test_ranges, vec![0..3]);
+}
+
+#[test]
+fn escaped_character_literals_do_not_open_strings() {
+    let content = "fn f(c: char) -> bool { matches!(c, '\\u{7b}'|'\"') }\n\n#[cfg(test)]\nmod tests {\n    fn t() {}\n}\n";
+    assert_eq!(CfgTestInfo::parse(content).test_ranges, vec![2..6]);
+}
+
+#[test]
+fn attributes_inside_strings_on_one_line_are_not_detected() {
+    let content = "let s = \"#[cfg(test)]\";\nmod helpers {\n    fn h() {}\n}\n";
+    assert!(CfgTestInfo::parse(content).test_ranges.is_empty());
+}
+
+#[test]
+fn nested_block_comments_hide_test_modules() {
+    let content = "/* a /* b */ \"\n#[cfg(test)]\nmod tests {\n}\n*/\nfn f() {}\n";
+    assert!(CfgTestInfo::parse(content).test_ranges.is_empty());
+}

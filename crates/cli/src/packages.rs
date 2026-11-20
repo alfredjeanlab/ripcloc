@@ -28,7 +28,12 @@ pub fn detect(root: &Path, language: Language) -> Vec<Package> {
         Language::Go => go_packages(root),
         Language::JavaScript => js_packages(root),
         Language::Python => python_package(root).into_iter().collect(),
-        Language::Ruby | Language::Shell | Language::Generic => vec![],
+        Language::Ruby
+        | Language::Dart
+        | Language::Swift
+        | Language::Jvm
+        | Language::Shell
+        | Language::Generic => vec![],
     };
     packages.sort_by(|a, b| a.path.cmp(&b.path));
     packages
@@ -54,7 +59,9 @@ pub fn manifest_name(dir: &Path, language: Language) -> Option<String> {
             .ok()?
             .flatten()
             .find_map(|e| Some(e.file_name().to_str()?.strip_suffix(".gemspec")?.to_string())),
-        Language::Shell | Language::Generic => None,
+        Language::Dart | Language::Swift | Language::Jvm | Language::Shell | Language::Generic => {
+            None
+        }
     }
 }
 
@@ -140,11 +147,7 @@ fn go_packages(root: &Path) -> Vec<Package> {
 /// Members of a pnpm or npm/yarn workspace that have a `package.json`, named by directory.
 fn js_packages(root: &Path) -> Vec<Package> {
     let pnpm = || -> Option<Vec<String>> {
-        let yaml: serde_yaml::Value =
-            serde_yaml::from_str(&fs::read_to_string(root.join("pnpm-workspace.yaml")).ok()?)
-                .ok()?;
-        let seq = yaml.get("packages")?.as_sequence()?;
-        Some(seq.iter().filter_map(|v| v.as_str().map(String::from)).collect())
+        Some(pnpm_packages(&fs::read_to_string(root.join("pnpm-workspace.yaml")).ok()?))
     };
     let npm = || -> Option<Vec<String>> {
         let json: serde_json::Value =
@@ -164,15 +167,110 @@ fn js_packages(root: &Path) -> Vec<Package> {
         .collect()
 }
 
+/// The `packages` list of a `pnpm-workspace.yaml`.
+///
+/// This is not a YAML parser. It reads the forms that pnpm documents, which are a block sequence
+/// under a top-level `packages` key and a flow sequence such as `packages: ['a/*', 'b']`, with
+/// quoted or plain items and `#` comments. Anything else yields an empty list.
+fn pnpm_packages(yaml: &str) -> Vec<String> {
+    let mut lines = yaml.lines().map(strip_comment);
+    let Some(rest) = lines.by_ref().find_map(|l| l.strip_prefix("packages:")) else {
+        return vec![];
+    };
+    let rest = rest.trim();
+    if rest.starts_with('[') {
+        // A flow sequence may continue over the following lines until its closing bracket.
+        let mut flow = rest.to_string();
+        while !flow.contains(']') {
+            let Some(line) = lines.next() else { break };
+            flow.push(' ');
+            flow.push_str(line);
+        }
+        let inner = flow.trim_start_matches('[').split(']').next().unwrap_or_default();
+        return split_unquoted(inner, ',')
+            .into_iter()
+            .map(unquote)
+            .filter(|s| !s.is_empty())
+            .collect();
+    }
+    if !rest.is_empty() {
+        return vec![];
+    }
+    // The block ends at the next line that starts in the first column and is not an item, which is
+    // the next top-level key.
+    lines
+        .filter(|l| !l.trim().is_empty())
+        .take_while(|l| l.starts_with([' ', '\t', '-']))
+        .filter_map(|l| l.trim_start().strip_prefix('-'))
+        .map(unquote)
+        .filter(|s| !s.is_empty())
+        .collect()
+}
+
+/// The line without a YAML comment, which starts at a `#` that is outside quotes and either begins
+/// the line or follows whitespace.
+fn strip_comment(line: &str) -> &str {
+    let mut quote = None;
+    let mut previous = ' ';
+    for (i, c) in line.char_indices() {
+        match (quote, c) {
+            (None, '#') if previous.is_whitespace() => return line.get(..i).unwrap_or(line),
+            (None, '\'' | '"') => quote = Some(c),
+            (Some(q), _) if c == q => quote = None,
+            _ => {}
+        }
+        previous = c;
+    }
+    line
+}
+
+/// The pieces of `text` between each `separator` that is outside quotes.
+fn split_unquoted(text: &str, separator: char) -> Vec<&str> {
+    let (mut pieces, mut start, mut quote) = (Vec::new(), 0, None);
+    for (i, c) in text.char_indices() {
+        match (quote, c) {
+            (None, '\'' | '"') => quote = Some(c),
+            (Some(q), _) if c == q => quote = None,
+            (None, _) if c == separator => {
+                pieces.extend(text.get(start..i));
+                start = i + c.len_utf8();
+            }
+            _ => {}
+        }
+    }
+    pieces.extend(text.get(start..));
+    pieces
+}
+
+/// A YAML scalar without surrounding whitespace and quotes.
+fn unquote(scalar: &str) -> String {
+    let scalar = scalar.trim();
+    ['\'', '"']
+        .iter()
+        .find_map(|&q| scalar.strip_prefix(q)?.strip_suffix(q))
+        .unwrap_or(scalar)
+        .to_string()
+}
+
 /// The name in `pyproject.toml`, or else in `setup.py`.
 fn python_name(root: &Path) -> Option<String> {
     read_toml(&root.join("pyproject.toml"))
         .and_then(|t| Some(t.get("project")?.get("name")?.as_str()?.to_string()))
-        .or_else(|| {
-            let setup = fs::read_to_string(root.join("setup.py")).ok()?;
-            let re = regex::Regex::new(r#"name\s*=\s*["']([^"']+)["']"#).ok()?;
-            Some(re.captures(&setup)?.get(1)?.as_str().to_string())
-        })
+        .or_else(|| setup_py_name(&fs::read_to_string(root.join("setup.py")).ok()?))
+}
+
+/// The first quoted string assigned to something that ends in `name` in a `setup.py`, as in
+/// `setup(name="pkg")`.
+///
+/// The opening and closing quotes do not have to match, and the string cannot be empty or contain
+/// either kind of quote.
+fn setup_py_name(setup: &str) -> Option<String> {
+    setup.match_indices("name").find_map(|(at, word)| {
+        let value = setup.get(at + word.len()..)?.trim_start().strip_prefix('=')?.trim_start();
+        let value = value.strip_prefix(['"', '\''])?;
+        let end = value.find(['"', '\''])?;
+        value.get(..end).filter(|name| !name.is_empty()).map(String::from)
+    })
 }
 
 /// The package directory of a Python project, named from `pyproject.toml` or `setup.py`.
@@ -304,6 +402,49 @@ mod tests {
             Language::JavaScript,
         );
         assert_eq!(found, pairs(&[("apps/web", "web")]));
+    }
+
+    #[test]
+    fn pnpm_block_sequence_with_quotes_comments_and_a_following_key() {
+        let yaml = "\
+# workspace
+packages:
+  # apps
+  - apps/*
+  - 'libs/**'  # shared
+  - \"tools/#cli\"
+  - '!**/test/**'
+
+catalog:
+  - not-a-package
+";
+        assert_eq!(pnpm_packages(yaml), ["apps/*", "libs/**", "tools/#cli", "!**/test/**"]);
+    }
+
+    #[test]
+    fn pnpm_items_may_start_in_the_first_column() {
+        assert_eq!(pnpm_packages("packages:\n- a\n- b\nother: 1\n"), ["a", "b"]);
+    }
+
+    #[test]
+    fn pnpm_flow_sequence() {
+        assert_eq!(pnpm_packages("packages: ['a/*', \"b,c\", d] # x\n"), ["a/*", "b,c", "d"]);
+        assert_eq!(pnpm_packages("packages: [\n  a,\n  b\n]\nnext: [c]\n"), ["a", "b"]);
+    }
+
+    #[test]
+    fn pnpm_without_a_top_level_packages_list() {
+        assert!(pnpm_packages("catalog:\n  packages:\n    - a\n").is_empty());
+        assert!(pnpm_packages("packages: apps\n").is_empty());
+        assert!(pnpm_packages("").is_empty());
+    }
+
+    #[test]
+    fn setup_py_names() {
+        assert_eq!(setup_py_name("setup(\n    name = \"pkg\",\n)").as_deref(), Some("pkg"));
+        assert_eq!(setup_py_name("setup(version='1', name='x')").as_deref(), Some("x"));
+        assert_eq!(setup_py_name("name = ''\nname='second'").as_deref(), Some("second"));
+        assert_eq!(setup_py_name("name = NAME"), None);
     }
 
     #[test]

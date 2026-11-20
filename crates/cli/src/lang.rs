@@ -4,12 +4,18 @@
 //! Project language detection and source/test classification.
 //!
 //! A file with one of its project language's extensions is classified by that language's test
-//! patterns, matched against its path from either the walked root or its project's root. Any other file is classified by [`GENERIC_TESTS`], and is source when none matches.
+//! patterns, matched against its path from either the walked root or its project's root.
+//!
+//! Any other file is classified by [`GENERIC_TESTS`], and is source when none matches.
+//!
+//! Patterns ignore case, so `Test/` and `Foo.Tests/` match as well as `test/` and `foo_tests/`.
+//! A path under `src/main/` is always source, because Maven, Gradle and sbt keep tests in
+//! `src/test/`, and a `test` directory under `src/main/` is a package such as `org.springframework.test`.
 
 use std::path::Path;
 use std::sync::OnceLock;
 
-use globset::{Glob, GlobSet, GlobSetBuilder};
+use globset::{GlobBuilder, GlobSet, GlobSetBuilder};
 
 /// The language of a project, detected from marker files in its root.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -19,30 +25,45 @@ pub enum Language {
     JavaScript,
     Python,
     Ruby,
+    Dart,
+    /// Swift and Objective-C, built by Swift Package Manager or Xcode.
+    Swift,
+    /// Java, Kotlin and Scala, built by Gradle or Maven.
+    Jvm,
     Shell,
     Generic,
 }
 
-/// Test patterns for files that are not in the project's language.
+/// Test patterns for files that are not in the project's language. A `spec` directory alone does
+/// not make a test, because outside Ruby it more often holds specifications, such as
+/// `rustc_target/src/spec`. A file in it whose name ends in `spec` does, as in RSpec, busted and
+/// phpspec.
+///
+/// A `tb` directory holds a hardware testbench. Hardware projects rarely have a manifest that is
+/// recognized, so they are generic, and a language with a manifest has its own patterns for its
+/// own files.
 const GENERIC_TESTS: &[&str] = &[
+    "**/tb/**",
     "**/tests/**",
     "**/test/**",
-    "**/spec/**",
     "**/__tests__/**",
     "**/*_tests/**",
+    "**/*.test/**",
+    "**/*.*tests/**",
     "**/*_test.*",
     "**/*_tests.*",
     "**/*.test.*",
     "**/*.spec.*",
+    "**/spec/**/*spec.*",
     "**/test_*.*",
 ];
 
 impl Language {
-    /// Detect the language of a project at `root`, from marker files checked in a fixed order.
-    pub fn detect(root: &Path) -> Self {
-        let names = names(root);
+    /// Detect the language of a project at `root`, whose entries are `names`, from marker files
+    /// checked in a fixed order.
+    pub fn detect(root: &Path, names: &[String]) -> Self {
         let has_sh = |dir: &Path| names_in(dir).any(|n| n.ends_with(".sh"));
-        Self::from_manifests(&names)
+        Self::from_manifests(names)
             .or_else(|| root.join("config/application.rb").exists().then_some(Self::Ruby))
             .or_else(|| {
                 (names.iter().any(|n| n.ends_with(".sh"))
@@ -53,9 +74,10 @@ impl Language {
             .unwrap_or(Self::Generic)
     }
 
-    /// Detect a project nested in another, which has a manifest such as `Cargo.toml`.
-    pub fn detect_nested(dir: &Path) -> Option<Self> {
-        Self::from_manifests(&names(dir))
+    /// Detect a project nested in another from the `names` of its directory's entries, which
+    /// include a manifest such as `Cargo.toml`.
+    pub fn detect_nested(names: &[String]) -> Option<Self> {
+        Self::from_manifests(names)
     }
 
     fn from_manifests(names: &[String]) -> Option<Self> {
@@ -68,6 +90,22 @@ impl Language {
             Some(Self::JavaScript)
         } else if has(&["pyproject.toml", "setup.py", "setup.cfg", "requirements.txt"]) {
             Some(Self::Python)
+        } else if has(&["pubspec.yaml"]) {
+            Some(Self::Dart)
+        } else if has(&["Package.swift"])
+            || names.iter().any(|n| n.ends_with(".xcodeproj") || n.ends_with(".xcworkspace"))
+        {
+            // An iOS app often has a Gemfile for CocoaPods or fastlane, so Swift is detected
+            // before Ruby.
+            Some(Self::Swift)
+        } else if has(&[
+            "build.gradle",
+            "build.gradle.kts",
+            "settings.gradle",
+            "settings.gradle.kts",
+            "pom.xml",
+        ]) {
+            Some(Self::Jvm)
         } else if has(&["Gemfile", "config.ru"]) || names.iter().any(|n| n.ends_with(".gemspec")) {
             Some(Self::Ruby)
         } else {
@@ -82,6 +120,9 @@ impl Language {
             Self::JavaScript => &["js", "jsx", "ts", "tsx", "mjs", "mts", "cjs", "cts"],
             Self::Python => &["py"],
             Self::Ruby => &["rb", "rake"],
+            Self::Dart => &["dart"],
+            Self::Swift => &["swift", "m", "mm"],
+            Self::Jvm => &["java", "kt", "kts", "scala"],
             Self::Shell => &["sh", "bash", "bats"],
             Self::Generic => &[],
         }
@@ -117,45 +158,94 @@ impl Language {
                 "**/conftest.py",
             ],
             Self::Ruby => {
-                &["spec/**/*_spec.rb", "test/**/*_test.rb", "test/**/test_*.rb", "features/**/*.rb"]
+                &["spec/**/*.rb", "test/**/*_test.rb", "test/**/test_*.rb", "features/**/*.rb"]
             }
+            Self::Dart => {
+                &["**/test/**", "**/integration_test/**", "**/test_driver/**", "**/*_test.dart"]
+            }
+            // Xcode names a test target after the app, as in `AppTests/` and `AppUITests/`, and
+            // Swift Package Manager keeps tests in `Tests/`. Both are beside the project's
+            // manifest, so a `Sources/ABTests/` module below it is source.
+            Self::Swift => &[
+                "*Tests/**",
+                "**/tests/**",
+                "**/*Tests.swift",
+                "**/*Test.swift",
+                "**/*Tests.m",
+                "**/*Tests.mm",
+            ],
+            // A Gradle source set for tests is named `test` or ends in `Test`, as in `androidTest`
+            // and Kotlin Multiplatform's `commonTest`, and `test*` also covers `testFixtures` and
+            // `testDebug`.
+            Self::Jvm => &["**/src/test*/**", "**/src/*Test/**"],
             Self::Shell => &["**/*.bats", "**/*_test.sh"],
             Self::Generic => GENERIC_TESTS,
         }
     }
 
     /// Whether a directory with this name is skipped, such as build output and installed
-    /// dependencies. A leading `*` matches any prefix.
-    pub fn excludes(self, name: &str) -> bool {
-        self.excluded_dirs()
-            .iter()
-            .any(|p| p.strip_prefix('*').map_or(name == *p, |s| name.ends_with(s)))
+    /// dependencies. A name that only tools use is skipped at any depth, while a generic name such
+    /// as `build` is skipped only when `at_root` says that the directory is directly inside the
+    /// project's root, since that is where tools put it. A leading `*` matches any prefix.
+    pub fn excludes(self, name: &str, at_root: bool) -> bool {
+        let matches = |patterns: &[&str]| {
+            patterns.iter().any(|p| p.strip_prefix('*').map_or(name == *p, |s| name.ends_with(s)))
+        };
+        matches(self.excluded_dirs()) || at_root && matches(self.excluded_root_dirs())
     }
 
+    /// Directories that are skipped at any depth, whose names only tools use.
     fn excluded_dirs(self) -> &'static [&'static str] {
         match self {
-            Self::Rust => &["target"],
-            Self::Go => &["vendor"],
-            Self::JavaScript => &["node_modules", "dist", "build", ".next", "coverage"],
+            Self::JavaScript => &["node_modules", ".next"],
             Self::Python => &[
                 ".venv",
-                "venv",
-                ".env",
-                "env",
                 "__pycache__",
                 ".mypy_cache",
                 ".pytest_cache",
                 ".ruff_cache",
-                "dist",
-                "build",
                 "*.egg-info",
                 ".tox",
                 ".nox",
             ],
+            Self::Rust
+            | Self::Go
+            | Self::Ruby
+            | Self::Dart
+            | Self::Swift
+            | Self::Jvm
+            | Self::Shell
+            | Self::Generic => &[],
+        }
+    }
+
+    /// Directories that are skipped only directly inside a project's root, whose names are also
+    /// common in source. A virtual environment is found by its `pyvenv.cfg` rather than by its
+    /// name, except for `venv`, since virtualenv before version 20 did not write one.
+    fn excluded_root_dirs(self) -> &'static [&'static str] {
+        match self {
+            Self::Rust => &["target"],
+            Self::Go => &["vendor"],
+            Self::JavaScript => &["dist", "build", "coverage"],
+            Self::Python => &["venv", "dist", "build"],
             Self::Ruby => &["vendor", "tmp", "log", "coverage"],
+            Self::Dart => &["build"],
+            Self::Swift => &["build", "DerivedData", "Pods", "Carthage"],
+            Self::Jvm => &["build", "target"],
             Self::Shell | Self::Generic => &[],
         }
     }
+}
+
+/// Files whose presence marks their directory as generated, whatever its name and depth. A
+/// `CACHEDIR.TAG` follows the Cache Directory Tagging specification, and Cargo, pytest and ruff
+/// write one into their output. A `pyvenv.cfg` marks a Python virtual environment.
+const GENERATED_MARKERS: &[&str] = &["CACHEDIR.TAG", "pyvenv.cfg"];
+
+/// Whether a directory whose entries are `names` holds generated files, such as build output or a
+/// virtual environment.
+pub fn is_generated(names: &[String]) -> bool {
+    names.iter().any(|n| GENERATED_MARKERS.contains(&n.as_str()))
 }
 
 /// Classifies paths as source or test.
@@ -169,16 +259,28 @@ impl Classifier {
     /// The classifier for `language`.
     pub fn of(language: Language) -> &'static Self {
         use Language::*;
-        static ALL: [Classifier; 7] = [
-            Classifier::new(Rust),
-            Classifier::new(Go),
-            Classifier::new(JavaScript),
-            Classifier::new(Python),
-            Classifier::new(Ruby),
-            Classifier::new(Shell),
-            Classifier::new(Generic),
-        ];
-        &ALL[language as usize]
+        static RUST: Classifier = Classifier::new(Rust);
+        static GO: Classifier = Classifier::new(Go);
+        static JAVASCRIPT: Classifier = Classifier::new(JavaScript);
+        static PYTHON: Classifier = Classifier::new(Python);
+        static RUBY: Classifier = Classifier::new(Ruby);
+        static DART: Classifier = Classifier::new(Dart);
+        static SWIFT: Classifier = Classifier::new(Swift);
+        static JVM: Classifier = Classifier::new(Jvm);
+        static SHELL: Classifier = Classifier::new(Shell);
+        static GENERIC: Classifier = Classifier::new(Generic);
+        match language {
+            Rust => &RUST,
+            Go => &GO,
+            JavaScript => &JAVASCRIPT,
+            Python => &PYTHON,
+            Ruby => &RUBY,
+            Dart => &DART,
+            Swift => &SWIFT,
+            Jvm => &JVM,
+            Shell => &SHELL,
+            Generic => &GENERIC,
+        }
     }
 
     const fn new(language: Language) -> Self {
@@ -191,6 +293,9 @@ impl Classifier {
 
     /// Whether the path is a test, rather than source.
     pub fn is_test(&self, path: &Path) -> bool {
+        if is_jvm_main(path) {
+            return false;
+        }
         let ext = path.extension().and_then(|e| e.to_str()).unwrap_or("");
         if self.language.extensions().contains(&ext) {
             self.tests().is_match(path)
@@ -201,7 +306,21 @@ impl Classifier {
     }
 }
 
-fn names(dir: &Path) -> Vec<String> {
+/// Whether `path` is under a `src/main/` directory.
+fn is_jvm_main(path: &Path) -> bool {
+    let mut after_src = false;
+    for component in path.components() {
+        let name = component.as_os_str();
+        if after_src && name == "main" {
+            return true;
+        }
+        after_src = name == "src";
+    }
+    false
+}
+
+/// The names of the entries in `dir`, which are empty when it cannot be read.
+pub fn names(dir: &Path) -> Vec<String> {
     names_in(dir).collect()
 }
 
@@ -213,9 +332,20 @@ fn names_in(dir: &Path) -> impl Iterator<Item = String> {
         .map(|e| e.file_name().to_string_lossy().into_owned())
 }
 
+/// The set of `patterns`, in which `*` matches within one path component and only `**` crosses a
+/// `/`, so that `src/*Test/**` does not match a `LoadTest` package deep inside `src/main`.
+///
+/// A pattern ignores case unless a `*` in it is followed by a capital letter, which marks a
+/// camelCase word boundary that only holds with its case. Otherwise `*Test.swift` would match
+/// `Latest.swift`.
 fn glob_set(patterns: &[&str]) -> GlobSet {
     let mut builder = GlobSetBuilder::new();
-    for glob in patterns.iter().filter_map(|p| Glob::new(p).ok()) {
+    let glob = |p: &&str| {
+        let camel_case =
+            p.split('*').skip(1).any(|s| s.starts_with(|c: char| c.is_ascii_uppercase()));
+        GlobBuilder::new(p).case_insensitive(!camel_case).literal_separator(true).build().ok()
+    };
+    for glob in patterns.iter().filter_map(glob) {
         builder.add(glob);
     }
     builder.build().unwrap_or_default()
@@ -238,6 +368,13 @@ mod tests {
     requirements = { "requirements.txt", Language::Python },
     gemfile = { "Gemfile", Language::Ruby },
     gemspec = { "x.gemspec", Language::Ruby },
+    pubspec = { "pubspec.yaml", Language::Dart },
+    swift_package = { "Package.swift", Language::Swift },
+    xcode_project = { "App.xcodeproj/project.pbxproj", Language::Swift },
+    xcode_workspace = { "App.xcworkspace/contents.xcworkspacedata", Language::Swift },
+    gradle = { "build.gradle", Language::Jvm },
+    gradle_kotlin = { "settings.gradle.kts", Language::Jvm },
+    maven = { "pom.xml", Language::Jvm },
     root_script = { "build.sh", Language::Shell },
     bin_script = { "bin/run.sh", Language::Shell },
     nothing = { "README.md", Language::Generic },
@@ -247,7 +384,15 @@ mod tests {
         let path = dir.path().join(marker);
         std::fs::create_dir_all(path.parent().unwrap()).unwrap();
         std::fs::write(path, "").unwrap();
-        assert_eq!(Language::detect(dir.path()), expected);
+        assert_eq!(Language::detect(dir.path(), &names(dir.path())), expected);
+    }
+
+    #[test]
+    fn swift_takes_precedence_over_a_cocoapods_gemfile() {
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::write(dir.path().join("Gemfile"), "").unwrap();
+        std::fs::create_dir(dir.path().join("App.xcodeproj")).unwrap();
+        assert_eq!(Language::detect(dir.path(), &names(dir.path())), Language::Swift);
     }
 
     #[test]
@@ -255,7 +400,7 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         std::fs::write(dir.path().join("Cargo.toml"), "").unwrap();
         std::fs::write(dir.path().join("package.json"), "").unwrap();
-        assert_eq!(Language::detect(dir.path()), Language::Rust);
+        assert_eq!(Language::detect(dir.path(), &names(dir.path())), Language::Rust);
     }
 
     #[parameterized(
@@ -274,12 +419,54 @@ mod tests {
     py_conftest = { Language::Python, "conftest.py", true },
     rb_src = { Language::Ruby, "lib/a.rb", false },
     rb_spec = { Language::Ruby, "spec/a_spec.rb", true },
+    rb_spec_helper = { Language::Ruby, "spec/spec_helper.rb", true },
+    rb_spec_support = { Language::Ruby, "spec/support/helpers.rb", true },
+    rb_spec_javascript = { Language::Ruby, "spec/javascripts/a_spec.js", true },
     sh_src = { Language::Shell, "bin/run.sh", false },
     sh_bats = { Language::Shell, "tests/run.bats", true },
+    dart_src = { Language::Dart, "lib/main.dart", false },
+    dart_test = { Language::Dart, "test/widget_test.dart", true },
+    dart_integration = { Language::Dart, "integration_test/app_test.dart", true },
+    swift_src = { Language::Swift, "App/ContentView.swift", false },
+    swift_xcode_target = { Language::Swift, "AppTests/ContentViewTests.swift", true },
+    swift_ui_target = { Language::Swift, "AppUITests/Launch.swift", true },
+    swift_package_tests = { Language::Swift, "Tests/CoreTests/Parser.swift", true },
+    swift_sources = { Language::Swift, "Sources/Core/Parser.swift", false },
+    objc_test = { Language::Swift, "AppTests/ViewTests.m", true },
+    swift_module_named_tests = { Language::Swift, "Sources/ABTests/Variant.swift", false },
+    swift_word_ending_in_test = { Language::Swift, "Sources/Core/Latest.swift", false },
+    swift_word_ending_in_tests = { Language::Swift, "Sources/Core/Contests.swift", false },
+    swift_lowercase_tests_dir = { Language::Swift, "tests/a.swift", true },
+    jvm_source_set_ending_in_test = { Language::Jvm, "app/src/latest/java/A.java", false },
+    jvm_package_named_test = { Language::Jvm, "src/main/java/a/LoadTest/Load.java", false },
+    jvm_module_without_manifest = { Language::Jvm, "core/src/test/java/a/ATest.java", true },
+    jvm_src = { Language::Jvm, "app/src/main/java/a/Main.java", false },
+    jvm_unit = { Language::Jvm, "app/src/test/kotlin/a/MainTest.kt", true },
+    jvm_android = { Language::Jvm, "app/src/androidTest/java/a/UiTest.java", true },
+    jvm_multiplatform = { Language::Jvm, "shared/src/commonTest/kotlin/a.kt", true },
+    jvm_multiplatform_src = { Language::Jvm, "shared/src/commonMain/kotlin/a.kt", false },
+    jvm_fixtures = { Language::Jvm, "lib/src/testFixtures/kotlin/a.kt", true },
+    jvm_scala = { Language::Jvm, "src/test/scala/a/ASpec.scala", true },
     other_language_in_tests = { Language::Rust, "tests/helper.py", true },
     other_language_src = { Language::Rust, "scripts/gen.py", false },
-    generic_spec = { Language::Generic, "spec/a.c", true },
+    generic_spec_dir_is_source = { Language::Generic, "spec/a.c", false },
+    generic_dot_spec = { Language::Generic, "src/a.spec.c", true },
+    busted_spec = { Language::Generic, "spec/foo_spec.lua", true },
+    phpspec_spec = { Language::Generic, "spec/App/FooSpec.php", true },
+    ruby_spec_dir = { Language::Ruby, "spec/models/user_spec.rb", true },
     generic_src = { Language::Generic, "src/a.c", false },
+    generic_testbench = { Language::Generic, "lib/axis/tb/axis_ep.py", true },
+    generic_rtl = { Language::Generic, "lib/axis/rtl/axis_fifo.v", false },
+    capitalized_test_dir = { Language::Generic, "src/Compilers/CSharp/Test/A.cs", true },
+    capitalized_tests_dir = { Language::Rust, "Tests/a.rs", true },
+    dotnet_tests_project = { Language::Generic, "Foo.Tests/B.cs", true },
+    dotnet_test_project = { Language::Generic, "src/Foo.Test/B.cs", true },
+    dotnet_unit_tests_project = { Language::Generic, "src/Foo.Bar.UnitTests/B.cs", true },
+    dotnet_integration_tests_project = { Language::Generic, "Foo.IntegrationTests/B.vb", true },
+    dotnet_src_project = { Language::Generic, "src/Foo.Core/B.cs", false },
+    capitalized_dot_test_file = { Language::JavaScript, "src/A.Test.ts", true },
+    jvm_test = { Language::Generic, "spring-core/src/test/java/a/ATests.java", true },
+    jvm_main_test_package = { Language::Generic, "spring-test/src/main/java/org/test/A.java", false },
 )]
     fn classifies_paths(language: Language, path: &str, is_test: bool) {
         assert_eq!(Classifier::of(language).is_test(Path::new(path)), is_test);
@@ -289,15 +476,32 @@ mod tests {
     fn nested_projects_need_a_manifest() {
         let dir = tempfile::tempdir().unwrap();
         std::fs::write(dir.path().join("build.sh"), "").unwrap();
-        assert_eq!(Language::detect_nested(dir.path()), None);
+        assert_eq!(Language::detect_nested(&names(dir.path())), None);
         std::fs::write(dir.path().join("pyproject.toml"), "").unwrap();
-        assert_eq!(Language::detect_nested(dir.path()), Some(Language::Python));
+        assert_eq!(Language::detect_nested(&names(dir.path())), Some(Language::Python));
     }
 
     #[test]
     fn excludes_match_names_and_suffixes() {
-        assert!(Language::Python.excludes("my_pkg.egg-info"));
-        assert!(Language::JavaScript.excludes("node_modules"));
-        assert!(!Language::Rust.excludes("src"));
+        assert!(Language::Python.excludes("my_pkg.egg-info", false));
+        assert!(Language::JavaScript.excludes("node_modules", false));
+        assert!(!Language::Rust.excludes("src", true));
+    }
+
+    #[test]
+    fn generic_names_are_excluded_only_at_the_root() {
+        assert!(Language::Python.excludes("build", true));
+        assert!(!Language::Python.excludes("build", false));
+        assert!(!Language::Python.excludes("env", true));
+        assert!(Language::Rust.excludes("target", true));
+        assert!(!Language::Rust.excludes("target", false));
+    }
+
+    #[test]
+    fn markers_make_a_directory_generated() {
+        let names = |n: &[&str]| n.iter().map(|s| (*s).to_owned()).collect::<Vec<_>>();
+        assert!(is_generated(&names(&["bin", "lib", "pyvenv.cfg"])));
+        assert!(is_generated(&names(&["CACHEDIR.TAG", "debug"])));
+        assert!(!is_generated(&names(&["__init__.py", "settings.py"])));
     }
 }

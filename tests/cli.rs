@@ -3,13 +3,13 @@
 
 //! Behavioral specs for the `ripcloc` binary.
 
-#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
+#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic, clippy::indexing_slicing)]
 
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
 fn ripcloc() -> Command {
-    Command::new(assert_cmd::cargo::cargo_bin!("ripcloc"))
+    Command::new(env!("CARGO_BIN_EXE_ripcloc"))
 }
 
 fn fixture(name: &str) -> PathBuf {
@@ -182,6 +182,75 @@ fn skips_language_default_dirs() {
     assert_eq!(language(&json, "JavaScript", "source")["files"], 1);
 }
 
+/// A generic name such as `build` is skipped only directly inside the project's root, and a
+/// virtual environment or cache is skipped by its marker file whatever its name
+#[test]
+fn skips_generated_dirs_by_place_and_marker() {
+    let temp = tree(&[
+        ("pyproject.toml", "[project]\nname = \"x\"\n"),
+        ("app/__init__.py", "x = 1\n"),
+        ("app/build/core.py", "x = 1\n"),
+        ("app/sub/dist/x.py", "x = 1\n"),
+        ("env/settings.py", "x = 1\n"),
+        ("build/lib/app/__init__.py", "x = 1\n"),
+        ("py312/pyvenv.cfg", ""),
+        ("py312/lib/site.py", "x = 1\n"),
+        ("out/CACHEDIR.TAG", ""),
+        ("out/gen.py", "x = 1\n"),
+    ]);
+    let json = cloc_json(temp.path());
+    assert_eq!(language(&json, "Python", "source")["files"], 4);
+}
+
+/// A file without an extension is counted in the language that its `#!` line names, and any other
+/// file without an extension is not counted
+#[test]
+fn counts_scripts_by_shebang() {
+    let temp = tree(&[
+        ("bin/tool", "#!/usr/bin/env python3\nprint(1)\n"),
+        ("bin/run", "#!/bin/sh\necho hi\n"),
+        ("LICENSE", "MIT\n"),
+    ]);
+
+    let json = cloc_json(temp.path());
+    assert_eq!(language(&json, "Python", "source")["code"], 1);
+    assert_eq!(language(&json, "Shell", "source")["code"], 1);
+    assert_eq!(json["totals"]["total"]["files"], 2);
+}
+
+/// A `.v` file is Coq or Verilog by its content, and Visual Basic in a `.Tests` project is a test,
+/// as C# is
+#[test]
+fn tells_coq_from_verilog_and_attributes_visual_basic_tests() {
+    let temp = tree(&[
+        ("theories/A.v", "(* c *)\nFrom Coq Require Import List.\nLemma l : True.\n"),
+        ("rtl/top.v", "// c\nmodule top;\nendmodule\n"),
+        ("src/Foo/Foo.vbproj", "<Project>\n</Project>\n"),
+        ("src/Foo/A.vb", "' c\nModule A\nEnd Module\n"),
+        ("src/Foo.Tests/ATests.vb", "Module ATests\nEnd Module\n"),
+    ]);
+    let json = cloc_json(temp.path());
+    let coq = language(&json, "Coq", "source");
+    assert_eq!((coq["files"].as_u64(), coq["comment"].as_u64()), (Some(1), Some(1)));
+    assert_eq!(language(&json, "Verilog", "source")["code"], 2);
+    assert_eq!(language(&json, "Visual Basic", "source")["code"], 2);
+    assert_eq!(language(&json, "Visual Basic", "test")["files"], 1);
+    assert_eq!(language(&json, "XML", "source")["files"], 1);
+}
+
+/// In a project without a manifest, a file in a `tb` directory is part of a testbench
+#[test]
+fn testbenches_are_tests() {
+    let temp = tree(&[
+        ("rtl/x.v", "module x;\nendmodule\n"),
+        ("tb/eth_ep.py", "class EthFrame:\n    pass\n"),
+    ]);
+    let json = cloc_json(temp.path());
+    assert_eq!(language(&json, "Verilog", "source")["files"], 1);
+    assert_eq!(language(&json, "Python", "test")["files"], 1);
+    assert_eq!(json["totals"]["test"]["files"], 1);
+}
+
 /// A monorepo without a root manifest is broken down by the packages of its nested projects
 #[test]
 fn breaks_down_nested_projects() {
@@ -226,8 +295,7 @@ fn depth_breaks_directories_down_into_packages() {
         ("gen.rs", "fn main() {}\n"),
     ]);
     let text = |args: &[&str]| {
-        let output =
-            ripcloc().args(args).env("NO_COLOR", "1").current_dir(temp.path()).output().unwrap();
+        let output = ripcloc().args(args).current_dir(temp.path()).output().unwrap();
         String::from_utf8(output.stdout).unwrap()
     };
     // The counts on the line for `label` in the Rust section.
@@ -257,6 +325,38 @@ fn depth_breaks_directories_down_into_packages() {
 
     let none = text(&["--depth", "0"]);
     assert!(none.lines().all(|l| !l.starts_with("  ")), "{none}");
+}
+
+/// The iOS and Android apps inside a React Native project are projects of their own, whose tests
+/// follow the conventions of Xcode and Gradle, and whose build directories are skipped
+#[test]
+fn mobile_apps_have_their_platforms_tests() {
+    let temp = tree(&[
+        ("package.json", "{\"name\": \"app\"}\n"),
+        ("Gemfile", "gem 'cocoapods'\n"),
+        ("src/App.tsx", "export const App = 1;\n"),
+        ("ios/App.xcodeproj/project.pbxproj", "{}\n"),
+        ("ios/Podfile", "platform :ios\n"),
+        ("ios/App/AppDelegate.swift", "import UIKit\n"),
+        ("ios/AppTests/AppTests.swift", "import XCTest\n"),
+        ("ios/AppUITests/Launch.m", "#import <XCTest/XCTest.h>\n"),
+        ("ios/Pods/Dep/Dep.swift", "let dep = 1\n"),
+        ("android/settings.gradle", "include ':app'\n"),
+        ("android/app/build.gradle", "apply plugin: 'com.android.application'\n"),
+        ("android/app/src/main/java/a/Main.kt", "class Main\n"),
+        ("android/app/src/test/java/a/MainTest.kt", "class MainTest\n"),
+        ("android/app/src/androidTest/java/a/UiTest.java", "class UiTest {}\n"),
+        ("android/app/build/generated/R.java", "class R {}\n"),
+    ]);
+    let json = cloc_json(temp.path());
+    assert_eq!(language(&json, "Swift", "source")["files"], 1);
+    assert_eq!(language(&json, "Swift", "test")["files"], 1);
+    assert_eq!(language(&json, "Objective-C", "test")["files"], 1);
+    assert_eq!(language(&json, "Kotlin", "source")["files"], 1);
+    assert_eq!(language(&json, "Kotlin", "test")["files"], 1);
+    assert_eq!(language(&json, "Java", "test")["files"], 1);
+    let rows = json["languages"].as_array().unwrap();
+    assert!(!rows.iter().any(|l| l["language"] == "Java" && l["kind"] == "source"), "{json}");
 }
 
 /// A nested project under the root's test directory is still tests
@@ -335,7 +435,7 @@ fn skips_files_over_max_file_size() {
 }
 
 /// Files over 1 GiB are skipped, `--no-large` skips files over 10 MB, and `--large` counts files of
-/// any size. The last of them wins, and `--max-file-size` overrides both.
+/// any size. `--max-file-size` sets any other limit.
 #[test]
 fn large_flags_set_the_size_limit() {
     let temp = tree(&[("small.py", "x = 1\n")]);
@@ -352,12 +452,10 @@ fn large_flags_set_the_size_limit() {
     };
     assert_eq!(count(&[]), 2);
     assert_eq!(count(&["--no-large"]), 1);
-    assert_eq!(count(&["--large", "--no-large"]), 1);
-    assert_eq!(count(&["--no-large", "--max-file-size", "100"]), 2);
-    assert_eq!(count(&["--large", "--max-file-size", "1"]), 1);
+    assert_eq!(count(&["--max-file-size", "100"]), 2);
     // `--large` would read the sparse file, so it is removed first.
     std::fs::remove_file(temp.path().join("huge.py")).unwrap();
-    assert_eq!(count(&["--no-large", "--large"]), 2);
+    assert_eq!(count(&["--large"]), 2);
 }
 
 /// Documentation, configuration and build files have one row, wherever they are
@@ -384,8 +482,7 @@ fn labels_and_single_parts() {
         ("tests/t.py", "def test(): pass\n"),
     ]);
     let text = |args: &[&str]| {
-        let output =
-            ripcloc().args(args).env("NO_COLOR", "1").current_dir(temp.path()).output().unwrap();
+        let output = ripcloc().args(args).current_dir(temp.path()).output().unwrap();
         String::from_utf8(output.stdout).unwrap()
     };
     let plain = text(&[]);
@@ -404,7 +501,7 @@ fn labels_and_single_parts() {
     assert!(after_rust.nth(1).unwrap_or_default().starts_with("  a "), "{plain}");
 
     let source_only = tree(&[("x.py", "x = 1\n")]);
-    let output = ripcloc().env("NO_COLOR", "1").current_dir(source_only.path()).output().unwrap();
+    let output = ripcloc().current_dir(source_only.path()).output().unwrap();
     let text = String::from_utf8(output.stdout).unwrap();
     assert!(text.lines().any(|l| l.starts_with("Python ")) && !text.contains("(source)"), "{text}");
 }
@@ -420,8 +517,7 @@ fn other_formats_are_not_broken_down_among_many_languages() {
         ("b/x.md", "# b\n"),
     ]);
     let text = |args: &[&str]| {
-        let output =
-            ripcloc().args(args).env("NO_COLOR", "1").current_dir(temp.path()).output().unwrap();
+        let output = ripcloc().args(args).current_dir(temp.path()).output().unwrap();
         String::from_utf8(output.stdout).unwrap()
     };
     let after = |text: &str, label: &str| -> String {
@@ -512,13 +608,13 @@ fn inline_tests_move_lines_but_not_the_file() {
     );
     assert_eq!(json["totals"]["total"]["files"], 1);
 
-    let output = ripcloc().arg("lib.rs").env("NO_COLOR", "1").current_dir(temp.path()).output();
+    let output = ripcloc().arg("lib.rs").current_dir(temp.path()).output();
     let text = String::from_utf8(output.unwrap().stdout).unwrap();
     let total = text.lines().find(|l| l.starts_with("Total ")).unwrap();
     assert_eq!(total.split_whitespace().nth(1), Some("1"), "{text}");
 }
 
-/// `--no-ignore` counts what ignore files leave out, and the last of it and `--ignore` wins
+/// `--no-ignore` counts what ignore files leave out
 #[test]
 fn no_ignore_counts_ignored_files() {
     let temp = tree(&[
@@ -533,7 +629,7 @@ fn no_ignore_counts_ignored_files() {
     };
     assert_eq!(files(&[]), 1);
     assert_eq!(files(&["--no-ignore"]), 2);
-    assert_eq!(files(&["--no-ignore", "--ignore"]), 1);
+    assert_eq!(files(&["--ignore"]), 1);
 }
 
 // =============================================================================
@@ -605,8 +701,7 @@ fn no_attribution_counts_each_language_as_one_row() {
 fn no_attribution_text_output() {
     let temp = mixed_tree();
     let text = |args: &[&str]| {
-        let output =
-            ripcloc().args(args).env("NO_COLOR", "1").current_dir(temp.path()).output().unwrap();
+        let output = ripcloc().args(args).current_dir(temp.path()).output().unwrap();
         assert!(output.status.success());
         String::from_utf8(output.stdout).unwrap()
     };
@@ -622,7 +717,87 @@ fn no_attribution_text_output() {
     assert!(!code_only.contains("Code total") && !code_only.contains("Other total"), "{code_only}");
     assert!(code_only.lines().any(|l| l.starts_with("Total ")), "{code_only}");
 
-    // The last of `--attribution` and `--no-attribution` wins.
-    assert!(text(&["--no-attribution", "--attribution"]).contains("Rust (tests)"));
-    assert!(!text(&["--attribution", "--no-attribution"]).contains("Rust (tests)"));
+    assert!(text(&["--attribution"]).contains("Rust (tests)"));
+}
+
+// =============================================================================
+// Errors and plain output
+// =============================================================================
+
+/// Contradictory flags are a usage error instead of the last one winning.
+#[test]
+fn contradictory_flags_are_errors() {
+    let pairs: &[&[&str]] = &[
+        &["--large", "--no-large"],
+        &["--ignore", "--no-ignore"],
+        &["--attribution", "--no-attribution"],
+        &["--max-file-size", "5", "--large"],
+        &["--max-file-size", "5", "--no-large"],
+    ];
+    for args in pairs {
+        let output = ripcloc().args(*args).current_dir(fixture("cloc-cmd")).output().unwrap();
+        assert_eq!(output.status.code(), Some(2), "{args:?} should be a usage error");
+    }
+}
+
+/// A named file of a type that is not counted is left out, like such a file in a directory.
+#[test]
+fn named_uncounted_file_is_ignored() {
+    let temp = tree(&[("foo.unknownext", "hello\n"), ("lib.rs", "fn f() {}\n")]);
+    let output = ripcloc()
+        .args(["-o", "json", "foo.unknownext", "lib.rs"])
+        .current_dir(temp.path())
+        .output()
+        .unwrap();
+    assert!(output.status.success());
+    let report: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
+    assert_eq!(report["totals"]["total"]["files"], 1, "{report}");
+}
+
+/// A directory with nothing to count is not an error.
+#[test]
+fn directory_without_source_is_not_error() {
+    let temp = tree(&[("foo.unknownext", "hello\n")]);
+    let output = ripcloc().current_dir(temp.path()).output().unwrap();
+    assert!(output.status.success());
+    assert!(String::from_utf8_lossy(&output.stdout).contains("No source files found."));
+}
+
+/// Output is never colored, even when `COLOR` is set.
+#[test]
+fn output_has_no_color() {
+    let output = ripcloc().env("COLOR", "1").current_dir(fixture("cloc-cmd")).output().unwrap();
+    assert!(output.status.success());
+    assert!(!output.stdout.contains(&0x1b));
+}
+
+/// A file with a NUL byte near its start is binary and is not counted, whatever its extension.
+#[test]
+fn binary_files_are_skipped() {
+    let temp = tree(&[("bin.rs", "fn main() {}\n\0\x01\x02\n"), ("lib.rs", "fn f() {}\n")]);
+    let output = ripcloc().args(["-o", "json"]).current_dir(temp.path()).output().unwrap();
+    assert!(output.status.success());
+    let report: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
+    assert_eq!(report["totals"]["total"]["files"], 1, "{report}");
+}
+
+/// A file that starts with a UTF-16 byte order mark is text, and is counted as its UTF-8 decoding.
+#[test]
+fn utf16_files_are_counted() {
+    let temp = tree(&[("lib.rs", "fn f() {}\n")]);
+    let text = "// note\nfn main() {}\n";
+    let little: Vec<u8> =
+        [0xFF, 0xFE].into_iter().chain(text.encode_utf16().flat_map(u16::to_le_bytes)).collect();
+    let big: Vec<u8> =
+        [0xFE, 0xFF].into_iter().chain(text.encode_utf16().flat_map(u16::to_be_bytes)).collect();
+    std::fs::write(temp.path().join("le.rs"), little).unwrap();
+    std::fs::write(temp.path().join("be.rs"), big).unwrap();
+    let output = ripcloc().args(["-o", "json"]).current_dir(temp.path()).output().unwrap();
+    let report: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
+    let total = &report["totals"]["total"];
+    assert_eq!(
+        (&total["files"], &total["comment"], &total["code"]),
+        (&3.into(), &2.into(), &3.into()),
+        "{report}"
+    );
 }
