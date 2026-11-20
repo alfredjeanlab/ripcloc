@@ -8,8 +8,12 @@
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
+/// The binary, with the color settings of the environment cleared, so that output does not depend
+/// on the shell that runs the tests.
 fn ripcloc() -> Command {
-    Command::new(env!("CARGO_BIN_EXE_ripcloc"))
+    let mut cmd = Command::new(env!("CARGO_BIN_EXE_ripcloc"));
+    cmd.env_remove("COLOR").env_remove("NO_COLOR");
+    cmd
 }
 
 fn fixture(name: &str) -> PathBuf {
@@ -80,8 +84,8 @@ fn shows_totals() {
     cmd.current_dir(fixture("cloc-cmd"));
     let output = cmd.output().expect("command should run");
     let stdout = String::from_utf8_lossy(&output.stdout);
-    assert!(stdout.contains("Source total"), "should have Source total");
-    assert!(stdout.contains("Test total"), "should have Test total");
+    assert!(stdout.contains("Total source"), "should have Total source");
+    assert!(stdout.contains("Total tests"), "should have Total tests");
     assert!(stdout.contains("Total"), "should have grand Total");
 }
 
@@ -200,6 +204,79 @@ fn skips_generated_dirs_by_place_and_marker() {
     ]);
     let json = cloc_json(temp.path());
     assert_eq!(language(&json, "Python", "source")["files"], 4);
+}
+
+/// A directory with a generic name such as `build` or `env` is counted, even directly inside the
+/// project's root, when it holds the project's own source
+#[test]
+fn counts_source_in_dirs_with_generic_names() {
+    let temp = tree(&[
+        ("pyproject.toml", "[project]\nname = \"x\"\n"),
+        ("build/core.py", "x = 1\n"),
+        ("env/settings.py", "x = 1\n"),
+    ]);
+    let json = cloc_json(temp.path());
+    assert_eq!(language(&json, "Python", "source")["files"], 2);
+}
+
+fn json_with(dir: &Path, args: &[&str]) -> serde_json::Value {
+    let output = ripcloc().args(["--output", "json"]).args(args).current_dir(dir).output().unwrap();
+    assert!(output.status.success());
+    serde_json::from_slice(&output.stdout).unwrap()
+}
+
+/// `--deps` counts a virtual environment, which is found by its `pyvenv.cfg`
+#[test]
+fn deps_count_a_virtual_environment() {
+    let temp = tree(&[
+        ("pyproject.toml", "[project]\nname = \"x\"\n"),
+        ("app.py", "x = 1\n"),
+        ("env/pyvenv.cfg", "home = /usr/bin\n"),
+        ("env/lib/python3.12/site-packages/dep.py", "x = 1\n"),
+    ]);
+    let files = |args: &[&str]| {
+        language(&json_with(temp.path(), args), "Python", "source")["files"].clone()
+    };
+    assert_eq!(files(&[]), 1);
+    assert_eq!(files(&["--no-deps"]), 1);
+    assert_eq!(files(&["--deps"]), 2);
+}
+
+/// `--deps` counts `node_modules/` and Go's `vendor/`
+#[test]
+fn deps_count_node_modules_and_vendor() {
+    let temp = tree(&[
+        ("package.json", "{\"name\": \"x\"}\n"),
+        ("index.js", "export const a = 1;\n"),
+        ("node_modules/dep/index.js", "module.exports = 1;\n"),
+    ]);
+    let files = |args: &[&str]| {
+        language(&json_with(temp.path(), args), "JavaScript", "source")["files"].clone()
+    };
+    assert_eq!(files(&[]), 1);
+    assert_eq!(files(&["--deps"]), 2);
+
+    let temp = tree(&[
+        ("go.mod", "module example.com/x\n"),
+        ("main.go", "package main\n"),
+        ("vendor/example.com/dep/dep.go", "package dep\n"),
+    ]);
+    let files =
+        |args: &[&str]| language(&json_with(temp.path(), args), "Go", "source")["files"].clone();
+    assert_eq!(files(&[]), 1);
+    assert_eq!(files(&["--deps"]), 2);
+}
+
+/// Build output such as Rust's `target/` is skipped even with `--deps`
+#[test]
+fn deps_still_skip_build_output() {
+    let temp = tree(&[
+        ("Cargo.toml", "[package]\nname = \"x\"\n"),
+        ("src/lib.rs", "fn f() {}\n"),
+        ("target/debug/build/out.rs", "fn g() {}\n"),
+    ]);
+    let json = json_with(temp.path(), &["--deps", "--no-ignore"]);
+    assert_eq!(language(&json, "Rust", "source")["files"], 1);
 }
 
 /// A file without an extension is counted in the language that its `#!` line names, and any other
@@ -518,8 +595,8 @@ fn docs_and_config_are_not_split_into_tests() {
     assert_eq!(json["totals"]["test"]["files"], 0);
 }
 
-/// `(source)` only shows beside `(tests)`, and a breakdown of one row stays for code but not for
-/// other formats
+/// `(source)` only shows beside `(tests)`, and a breakdown of one row, which repeats the row above
+/// it, shows only with a `--depth`
 #[test]
 fn labels_and_single_parts() {
     let temp = tree(&[
@@ -545,9 +622,17 @@ fn labels_and_single_parts() {
     assert!(labels.contains(&"Python (source)"));
     assert!(labels.contains(&"Python (tests)"));
     assert!(labels.contains(&"TOML"));
-    // Rust's rows are all in package `a`, which still shows where they are.
-    let mut after_rust = plain.lines().skip_while(|l| !l.starts_with("Rust (source)"));
-    assert!(after_rust.nth(1).unwrap_or_default().starts_with("  a "), "{plain}");
+    // Rust's rows are all in package `a`, so its breakdown would be one row.
+    let after = |text: &str| {
+        text.lines()
+            .skip_while(|l| !l.starts_with("Rust (source)"))
+            .nth(1)
+            .unwrap_or_default()
+            .to_string()
+    };
+    assert!(!after(&plain).starts_with("  a "), "{plain}");
+    let deep = text(&["--depth", "1"]);
+    assert!(after(&deep).starts_with("  a "), "{deep}");
 
     let source_only = tree(&[("x.py", "x = 1\n")]);
     let output = ripcloc().current_dir(source_only.path()).output().unwrap();
@@ -555,16 +640,10 @@ fn labels_and_single_parts() {
     assert!(text.lines().any(|l| l.starts_with("Python ")) && !text.contains("(source)"), "{text}");
 }
 
-/// With four or more languages and no `--depth`, other formats are one number each
+/// Without a `--depth`, other formats are one number each, however few languages there are
 #[test]
-fn other_formats_are_not_broken_down_among_many_languages() {
-    let temp = tree(&[
-        ("a/x.rs", "fn a() {}\n"),
-        ("a/x.py", "x = 1\n"),
-        ("b/x.go", "package b\n"),
-        ("a/x.md", "# a\n"),
-        ("b/x.md", "# b\n"),
-    ]);
+fn other_formats_are_not_broken_down_by_default() {
+    let temp = tree(&[("a/x.rs", "fn a() {}\n"), ("a/x.md", "# a\n"), ("b/x.md", "# b\n")]);
     let text = |args: &[&str]| {
         let output = ripcloc().args(args).current_dir(temp.path()).output().unwrap();
         String::from_utf8(output.stdout).unwrap()
@@ -574,8 +653,116 @@ fn other_formats_are_not_broken_down_among_many_languages() {
     };
     let plain = text(&[]);
     assert!(!after(&plain, "Markdown").starts_with("  "), "{plain}");
-    assert!(after(&plain, "Rust").starts_with("  a "), "{plain}");
     assert!(after(&text(&["--depth", "1"]), "Markdown").starts_with("  a "));
+}
+
+/// Without a `--depth`, a row with less than 2% of the lines above it is folded into `…`, which
+/// still adds up to the row above
+#[test]
+fn small_rows_are_folded_by_default() {
+    let big = "fn a() {}\n".repeat(99);
+    let temp =
+        tree(&[("big/x.rs", &big), ("small/x.rs", "fn b() {}\n"), ("mid/x.rs", &big[..100])]);
+    let text = |args: &[&str]| {
+        let output = ripcloc().args(args).current_dir(temp.path()).output().unwrap();
+        String::from_utf8(output.stdout).unwrap()
+    };
+    let plain = text(&[]);
+    assert!(plain.lines().any(|l| l.starts_with("  big ")), "{plain}");
+    assert!(plain.lines().any(|l| l.starts_with("  mid ")), "{plain}");
+    assert!(!plain.contains("small"), "{plain}");
+    let rest =
+        plain.lines().find(|l| l.starts_with("  \u{2026} ")).unwrap_or_else(|| panic!("{plain}"));
+    assert_eq!(rest.split_whitespace().nth(1), Some("1"), "{plain}");
+    assert!(text(&["--depth", "1"]).lines().any(|l| l.starts_with("  small ")));
+}
+
+/// A reader that stops early, such as `head`, ends the report without an error or a panic
+#[test]
+fn stops_quietly_when_the_reader_closes() {
+    // With `--depth`, no row is folded, so each directory is a row and the report is larger than a
+    // pipe's buffer.
+    let names: Vec<String> = (0..3000).map(|i| format!("d{i}/x.rs")).collect();
+    let files: Vec<(&str, &str)> = names.iter().map(|n| (n.as_str(), "fn a() {}\n")).collect();
+    let temp = tree(&files);
+    let mut child = ripcloc()
+        .args(["--depth", "1"])
+        .current_dir(temp.path())
+        .stdout(std::process::Stdio::piped())
+        .stderr(std::process::Stdio::piped())
+        .spawn()
+        .unwrap();
+    let mut start = [0; 16];
+    std::io::Read::read_exact(child.stdout.as_mut().unwrap(), &mut start).unwrap();
+    drop(child.stdout.take());
+    let output = child.wait_with_output().unwrap();
+    assert!(output.status.success(), "{:?}", output.status);
+    assert!(output.stderr.is_empty(), "{}", String::from_utf8_lossy(&output.stderr));
+}
+
+/// The text report is colored only on a terminal or with `COLOR`, `NO_COLOR` wins over `COLOR`, and
+/// JSON is never colored
+#[test]
+fn colors_the_text_report_only_when_asked() {
+    let temp = tree(&[("a/x.rs", "fn a() {}\n"), ("b/y.rs", "fn b() {}\n")]);
+    let run = |args: &[&str], env: &[(&str, &str)]| {
+        let mut cmd = ripcloc();
+        cmd.args(args).current_dir(temp.path());
+        for (key, value) in env {
+            cmd.env(key, value);
+        }
+        String::from_utf8(cmd.output().unwrap().stdout).unwrap()
+    };
+    assert!(!run(&[], &[]).contains('\x1b'), "a pipe is not a terminal");
+    assert!(run(&[], &[("COLOR", "1")]).contains("\x1b[38;5;74mLanguage"));
+    assert!(!run(&[], &[("COLOR", "1"), ("NO_COLOR", "1")]).contains('\x1b'));
+    assert!(!run(&["-o", "json"], &[("COLOR", "1")]).contains('\x1b'));
+}
+
+/// Help is colored under the same rules as the report, with plain text when it is piped
+#[test]
+fn colors_help_only_when_asked() {
+    let help = |env: &[(&str, &str)]| {
+        let mut cmd = ripcloc();
+        cmd.arg("--help");
+        for (key, value) in env {
+            cmd.env(key, value);
+        }
+        String::from_utf8(cmd.output().unwrap().stdout).unwrap()
+    };
+    let plain = help(&[]);
+    assert!(!plain.contains('\x1b'), "{plain}");
+    let colored = help(&[("COLOR", "1")]);
+    assert!(colored.contains("\x1b[38;5;74mOptions:\x1b[0m"), "{colored}");
+    assert!(colored.contains("\x1b[38;5;250m  -o, --output <FORMAT>\x1b[0m"), "{colored}");
+    assert!(colored.contains("\x1b[38;5;245m[default: text]\x1b[0m"), "{colored}");
+    assert!(!help(&[("COLOR", "1"), ("NO_COLOR", "1")]).contains('\x1b'));
+    // Without its escapes, the colored help is the plain help.
+    let stripped = colored.split("\x1b[").enumerate().map(|(i, part)| {
+        if i == 0 { part } else { part.split_once('m').map_or(part, |(_, rest)| rest) }
+    });
+    assert_eq!(stripped.collect::<String>(), plain);
+}
+
+/// Without a `--depth`, a language with less than 1% of the report's lines is one row, and with a
+/// `--depth` it is broken down
+#[test]
+fn small_languages_are_not_broken_down() {
+    let big = "fn a() {}\n".repeat(300);
+    let temp =
+        tree(&[("a/x.rs", &big), ("b/y.rs", &big), ("c/t.sh", "echo c\n"), ("d/u.sh", "echo d\n")]);
+    let text = |args: &[&str]| {
+        let output = ripcloc().args(args).current_dir(temp.path()).output().unwrap();
+        String::from_utf8(output.stdout).unwrap()
+    };
+    let plain = text(&[]);
+    assert!(plain.lines().any(|l| l.starts_with("  a ")), "{plain}");
+    assert!(!plain.lines().any(|l| l.starts_with("  c ") || l.starts_with("  d ")), "{plain}");
+    let deep = text(&["--depth", "1"]);
+    assert!(
+        deep.lines().any(|l| l.starts_with("  c ")) && deep.lines().any(|l| l.starts_with("  d ")),
+        "{deep}"
+    );
 }
 
 /// A missing path is an error
@@ -659,7 +846,7 @@ fn inline_tests_move_lines_but_not_the_file() {
 
     let output = ripcloc().arg("lib.rs").current_dir(temp.path()).output();
     let text = String::from_utf8(output.unwrap().stdout).unwrap();
-    let total = text.lines().find(|l| l.starts_with("Total ")).unwrap();
+    let total = text.lines().rev().find(|l| l.starts_with("Total ")).unwrap();
     assert_eq!(total.split_whitespace().nth(1), Some("1"), "{text}");
 }
 
@@ -756,17 +943,35 @@ fn no_attribution_text_output() {
     };
     let all = text(&["--no-attribution", "--depth", "1"]);
     assert!(!all.contains("(source)") && !all.contains("(tests)"), "{all}");
-    assert!(!all.contains("Source total") && !all.contains("Test total"), "{all}");
+    assert!(!all.contains("Total source") && !all.contains("Total tests"), "{all}");
     assert!(all.lines().any(|l| l.starts_with("Rust ")), "{all}");
     assert!(all.lines().any(|l| l.starts_with("  a ")), "{all}");
-    assert!(all.lines().any(|l| l.starts_with("Code total ")), "{all}");
-    assert!(all.lines().any(|l| l.starts_with("Other total ")), "{all}");
+    assert!(all.lines().any(|l| l.starts_with("Total code ")), "{all}");
+    assert!(all.lines().any(|l| l.starts_with("Total other ")), "{all}");
 
     let code_only = text(&["--no-attribution", "a/src/lib.rs"]);
-    assert!(!code_only.contains("Code total") && !code_only.contains("Other total"), "{code_only}");
+    assert!(!code_only.contains("Total code") && !code_only.contains("Total other"), "{code_only}");
     assert!(code_only.lines().any(|l| l.starts_with("Total ")), "{code_only}");
 
     assert!(text(&["--attribution"]).contains("Rust (tests)"));
+}
+
+/// `--compact` is `--no-attribution` without a breakdown, unless a `--depth` asks for one
+#[test]
+fn compact_is_one_row_per_language() {
+    let temp = mixed_tree();
+    let run = |args: &[&str]| {
+        let output = ripcloc().args(args).current_dir(temp.path()).output().unwrap();
+        assert!(output.status.success(), "{args:?}");
+        String::from_utf8(output.stdout).unwrap()
+    };
+    for flag in ["-c", "--compact"] {
+        let text = run(&[flag]);
+        assert!(!text.contains("(source)") && !text.contains("(tests)"), "{text}");
+        assert!(text.lines().all(|l| !l.starts_with("  ")), "{text}");
+        assert_eq!(run(&[flag, "-o", "json"]), run(&["--no-attribution", "-o", "json"]));
+    }
+    assert!(run(&["-c", "--depth", "1"]).lines().any(|l| l.starts_with("  a ")));
 }
 
 // =============================================================================
@@ -780,8 +985,11 @@ fn contradictory_flags_are_errors() {
         &["--large", "--no-large"],
         &["--ignore", "--no-ignore"],
         &["--attribution", "--no-attribution"],
+        &["--deps", "--no-deps"],
+        &["--attribution", "--compact"],
         &["--max-file-size", "5", "--large"],
         &["--max-file-size", "5", "--no-large"],
+        &["--deps", "--no-deps"],
     ];
     for args in pairs {
         let output = ripcloc().args(*args).current_dir(fixture("cloc-cmd")).output().unwrap();
@@ -812,12 +1020,57 @@ fn directory_without_source_is_not_error() {
     assert!(String::from_utf8_lossy(&output.stdout).contains("No source files found."));
 }
 
-/// Output is never colored, even when `COLOR` is set.
-#[test]
-fn output_has_no_color() {
-    let output = ripcloc().env("COLOR", "1").current_dir(fixture("cloc-cmd")).output().unwrap();
+/// Make each of `files` under `dir` unreadable, and return false if one can still be read, as it
+/// can be by root.
+#[cfg(unix)]
+fn make_unreadable(dir: &Path, files: &[&str]) -> bool {
+    use std::os::unix::fs::PermissionsExt;
+    for file in files {
+        let path = dir.join(file);
+        std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o000)).unwrap();
+        if std::fs::File::open(&path).is_ok() {
+            return false;
+        }
+    }
+    true
+}
+
+/// When nothing could be counted, the report says how many files could not be read, with the
+/// right plural, whether the files are named or walked.
+#[cfg(unix)]
+#[yare::parameterized(
+    named_one = { &["a.rs"], &["a.rs"], "No source files found (skipped 1 unreadable file).\n" },
+    walked_many = { &["a.rs", "b.py", "c.go"], &[], "No source files found (skipped 3 unreadable files).\n" },
+)]
+fn unreadable_files_are_counted_when_nothing_is_found(
+    files: &[&str],
+    args: &[&str],
+    expected: &str,
+) {
+    let entries: Vec<(&str, &str)> = files.iter().map(|f| (*f, "x = 1\n")).collect();
+    let temp = tree(&entries);
+    if !make_unreadable(temp.path(), files) {
+        return;
+    }
+    let output = ripcloc().args(args).current_dir(temp.path()).output().unwrap();
     assert!(output.status.success());
-    assert!(!output.stdout.contains(&0x1b));
+    assert_eq!(String::from_utf8_lossy(&output.stdout), expected);
+    assert!(output.stderr.is_empty());
+}
+
+/// An unreadable file is not mentioned when other files are counted.
+#[cfg(unix)]
+#[test]
+fn unreadable_files_are_quiet_beside_a_report() {
+    let temp = tree(&[("a.rs", "fn a() {}\n"), ("b.rs", "fn b() {}\n")]);
+    if !make_unreadable(temp.path(), &["b.rs"]) {
+        return;
+    }
+    let output = ripcloc().args(["-o", "json"]).current_dir(temp.path()).output().unwrap();
+    assert!(output.status.success());
+    assert!(output.stderr.is_empty());
+    let report: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
+    assert_eq!(report["totals"]["total"]["files"], 1, "{report}");
 }
 
 /// A file with a NUL byte near its start is binary and is not counted, whatever its extension.
@@ -849,4 +1102,201 @@ fn utf16_files_are_counted() {
         (&3.into(), &2.into(), &3.into()),
         "{report}"
     );
+}
+
+// =============================================================================
+// Command line
+// =============================================================================
+
+/// The flags that are accepted but left out of the help and the README.
+const HIDDEN: &[&str] = &["--max-depth", "--max-file-size"];
+
+/// Every flag that the parser matches, such as `-o` and `--output`, read from its source.
+fn parsed_flags() -> Vec<String> {
+    let path = Path::new(env!("CARGO_MANIFEST_DIR")).join("src/args.rs");
+    let source = std::fs::read_to_string(path).unwrap();
+    let longs = source.split("Long(\"").skip(1).filter_map(|s| s.split_once('"'));
+    let shorts = source.split("Short('").skip(1).filter_map(|s| s.split_once('\''));
+    let mut flags: Vec<String> = longs
+        .map(|(name, _)| format!("--{name}"))
+        .chain(shorts.map(|(name, _)| format!("-{name}")))
+        .collect();
+    flags.sort();
+    flags.dedup();
+    assert!(flags.len() > HIDDEN.len(), "no flags found in args.rs");
+    flags
+}
+
+/// The flags that `text` mentions, with each `--[no-]x` taken as `--x` and `--no-x`.
+fn mentioned_flags(text: &str) -> Vec<String> {
+    let mut flags = Vec::new();
+    for word in text.split(|c: char| c.is_whitespace() || c == ',' || c == '`') {
+        let word = word.trim_end_matches(|c: char| !c.is_ascii_alphanumeric());
+        if let Some(name) = word.strip_prefix("--[no-]") {
+            flags.extend([format!("--{name}"), format!("--no-{name}")]);
+        } else if word.starts_with('-') && word.len() >= 2 && word != "--" {
+            flags.push(word.to_string());
+        }
+    }
+    flags.sort();
+    flags.dedup();
+    flags
+}
+
+fn help() -> String {
+    let output = ripcloc().arg("--help").output().unwrap();
+    assert_eq!(output.status.code(), Some(0));
+    assert!(output.stderr.is_empty());
+    String::from_utf8(output.stdout).unwrap()
+}
+
+/// The help lists every flag that the parser accepts except the hidden ones, and every flag that
+/// it lists is accepted.
+#[test]
+fn help_lists_every_flag() {
+    let parsed = parsed_flags();
+    let listed = mentioned_flags(&help());
+    for flag in &parsed {
+        let hidden = HIDDEN.contains(&flag.as_str());
+        assert_eq!(listed.contains(flag), !hidden, "{flag} in the help");
+    }
+    for flag in &listed {
+        assert!(parsed.contains(flag), "{flag} is in the help but is not parsed");
+    }
+}
+
+/// Every flag in the README's Usage block is accepted, and the hidden flags are not there.
+#[test]
+fn readme_usage_flags_exist() {
+    let path = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../README.md");
+    let readme = std::fs::read_to_string(path).unwrap();
+    let (_, usage) = readme.split_once("## Usage").unwrap();
+    let (_, usage) = usage.split_once("```").unwrap();
+    let (usage, _) = usage.split_once("```").unwrap();
+    let parsed = parsed_flags();
+    let listed = mentioned_flags(usage);
+    assert!(!listed.is_empty());
+    for flag in &listed {
+        assert!(parsed.contains(flag), "{flag} is in the README but is not parsed");
+        assert!(!HIDDEN.contains(&flag.as_str()), "{flag} is hidden but in the README");
+    }
+}
+
+/// `-h` and `--help` print the same plain text, which fits in 100 columns, even when color is
+/// asked for.
+#[test]
+fn help_is_plain_text() {
+    let text = help();
+    let short = ripcloc().arg("-h").env("CLICOLOR_FORCE", "1").output().unwrap();
+    assert_eq!(String::from_utf8(short.stdout).unwrap(), text);
+    assert!(text.is_ascii() && !text.contains('\x1b'));
+    assert!(text.lines().all(|l| l.len() < 100), "{text}");
+}
+
+/// `-V` and `--version` print the name and the version of the package.
+#[test]
+fn prints_the_version() {
+    for flag in ["-V", "--version"] {
+        let output = ripcloc().arg(flag).output().unwrap();
+        assert_eq!(output.status.code(), Some(0));
+        let expected = format!("ripcloc {}\n", env!("CARGO_PKG_VERSION"));
+        assert_eq!(String::from_utf8(output.stdout).unwrap(), expected);
+    }
+}
+
+fn run_in_fixture(args: &[&str]) -> Vec<u8> {
+    let output = ripcloc().args(args).current_dir(fixture("cloc-cmd")).output().unwrap();
+    assert!(output.status.success(), "{args:?}");
+    output.stdout
+}
+
+/// A value is given after a space, after `=`, or right after a short flag.
+#[test]
+fn values_take_every_syntax() {
+    let json = run_in_fixture(&["-o", "json"]);
+    serde_json::from_slice::<serde_json::Value>(&json).unwrap();
+    for args in [&["--output", "json"][..], &["--output=json"], &["-ojson"]] {
+        assert_eq!(run_in_fixture(args), json, "{args:?}");
+    }
+    assert_eq!(run_in_fixture(&["-co", "json"]), run_in_fixture(&["-c", "-o", "json"]));
+    assert_eq!(run_in_fixture(&["--depth=0"]), run_in_fixture(&["--depth", "0"]));
+}
+
+/// A repeated flag is accepted, and its last value wins.
+#[test]
+fn last_value_wins() {
+    let json = run_in_fixture(&["-o", "json"]);
+    assert_eq!(run_in_fixture(&["-o", "text", "-o", "json"]), json);
+    let depth = run_in_fixture(&["--depth", "1"]);
+    assert_eq!(run_in_fixture(&["--depth", "0", "--depth", "1"]), depth);
+    assert_eq!(run_in_fixture(&["--no-ignore", "--no-ignore"]), run_in_fixture(&["--no-ignore"]));
+}
+
+/// After `--`, every argument is a path, even one that starts with `-`.
+#[test]
+fn double_dash_ends_the_flags() {
+    let temp = tree(&[("-c/x.rs", "fn a() {}\n")]);
+    let output = ripcloc().args(["-o", "json", "--", "-c"]).current_dir(temp.path()).output();
+    let report: serde_json::Value = serde_json::from_slice(&output.unwrap().stdout).unwrap();
+    assert_eq!(report["totals"]["total"]["files"], 1);
+    assert_eq!(report["attribution"], true);
+}
+
+/// A usage error is printed to stderr with exit status 2 and a message that names the flag.
+#[test]
+fn usage_errors_name_the_flag() {
+    let cases: &[(&[&str], &str)] = &[
+        (&["--depth"], "--depth needs a value"),
+        (&["-o"], "-o needs a value"),
+        (&["--depth", "x"], "invalid value 'x' for --depth"),
+        (&["--max-file-size", "-1"], "invalid value '-1' for --max-file-size"),
+        (&["--output", "yaml"], "invalid value 'yaml' for --output"),
+        (&["--compact=yes"], "--compact does not take a value"),
+        (&["--bogus"], "unknown flag --bogus"),
+        (&["-x"], "unknown flag -x"),
+        (&["--larg"], "did you mean --large?"),
+        (&["--no-ignor"], "did you mean --no-ignore?"),
+        (&["--large", "--no-large"], "--large cannot be used with --no-large"),
+    ];
+    for (args, message) in cases {
+        let output = ripcloc().args(*args).current_dir(fixture("cloc-cmd")).output().unwrap();
+        assert_eq!(output.status.code(), Some(2), "{args:?}");
+        assert!(output.stdout.is_empty(), "{args:?}");
+        let stderr = String::from_utf8(output.stderr).unwrap();
+        assert!(stderr.contains(message), "{args:?}: {stderr}");
+        assert!(stderr.contains("--help"), "{args:?}: {stderr}");
+        assert!(!stderr.contains('\x1b'), "{args:?}: {stderr}");
+    }
+}
+
+/// A path that cannot be read fails the run with exit status 1, which is not a usage error.
+#[test]
+fn run_errors_exit_with_one() {
+    let output = ripcloc().arg("does-not-exist").current_dir(fixture("cloc-cmd")).output();
+    assert_eq!(output.unwrap().status.code(), Some(1));
+}
+
+/// The hidden `--max-depth` still limits the walk, and the hidden `--max-file-size` still limits
+/// the size of a file, as `skips_files_over_max_file_size` checks.
+#[test]
+fn hidden_flags_still_work() {
+    let temp = tree(&[("top.rs", "fn a() {}\n"), ("a/b/deep.rs", "fn b() {}\n")]);
+    let files = |args: &[&str]| {
+        let output = ripcloc().args(args).arg("-ojson").current_dir(temp.path()).output().unwrap();
+        assert!(output.status.success(), "{args:?}");
+        let report: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
+        report["totals"]["total"]["files"].clone()
+    };
+    assert_eq!(files(&[]), 2);
+    assert_eq!(files(&["--max-depth", "1"]), 1);
+    assert_eq!(files(&["--max-depth=2", "--max-file-size=1"]), 1);
+}
+
+/// `--languages`, `--deps` and `--no-deps` are accepted.
+#[test]
+fn accepts_languages_and_deps() {
+    for flag in ["--languages", "--deps", "--no-deps"] {
+        let output = ripcloc().arg(flag).current_dir(fixture("cloc-cmd")).output().unwrap();
+        assert_eq!(output.status.code(), Some(0), "{flag}");
+    }
 }

@@ -16,7 +16,7 @@ use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex, MutexGuard, PoisonError};
 
-use crate::lang::{self, Language};
+use crate::lang::{self, DirKind, Language};
 use crate::packages;
 
 /// The project and package of a directory.
@@ -36,8 +36,9 @@ pub struct Context {
     /// directory, then the name of each package that encloses it below that. One of the walked
     /// root's own packages takes the place of the top-level directory.
     pub chain: Arc<[Arc<str>]>,
-    /// Whether the directory holds a file that marks it as generated, such as a `pyvenv.cfg`.
-    pub generated: bool,
+    /// What a marker file in the directory says that it holds, such as a `pyvenv.cfg` for a
+    /// virtual environment.
+    pub marker: Option<DirKind>,
     /// The root and label of the outermost Go module with more than one package that encloses
     /// the directory, whose directories with `.go` files are each a package.
     pub go_module: Option<(Arc<Path>, Arc<str>)>,
@@ -78,7 +79,7 @@ impl Resolver {
         }
         let parent = dir.parent().filter(|_| !self.roots.contains(dir)).map(|p| self.context(p));
         let names = lang::names(dir);
-        let generated = lang::is_generated(&names);
+        let marker = lang::marker(&names);
         let language = match &parent {
             None => Some(Language::detect(dir, &names)),
             Some(_) => Language::detect_nested(&names),
@@ -154,7 +155,7 @@ impl Resolver {
                     package,
                     group,
                     chain,
-                    generated,
+                    marker,
                     go_module,
                 }
             }
@@ -166,7 +167,7 @@ impl Resolver {
                 package,
                 group,
                 chain,
-                generated,
+                marker,
                 go_module,
             },
         });
@@ -312,20 +313,22 @@ mod tests {
     }
 
     #[test]
-    fn excludes_follow_the_innermost_and_root_languages() {
+    fn skips_follow_the_innermost_and_root_languages() {
         let dir = monorepo();
         let resolver = Resolver::new([dir.path().to_path_buf()]);
         let engine = resolver.context(&dir.path().join("engine"));
-        assert!(engine.language.excludes("target", true));
-        assert!(!engine.root_language.excludes("target", true));
-        assert!(resolver.context(&dir.path().join("web")).language.excludes("dist", true));
+        let target = dir.path().join("engine/target");
+        assert!(engine.language.skips(&target, "target", true, false));
+        assert!(!engine.root_language.skips(&target, "target", true, false));
+        let web = resolver.context(&dir.path().join("web"));
+        assert!(web.language.skips(&dir.path().join("web/dist"), "dist", true, false));
     }
 
     #[test]
-    fn a_marker_makes_a_directory_generated() {
+    fn a_marker_says_what_a_directory_holds() {
         let dir = tree(&["pyproject.toml", "env/pyvenv.cfg", "app/__init__.py"]);
         let resolver = Resolver::new([dir.path().to_path_buf()]);
-        assert!(resolver.context(&dir.path().join("env")).generated);
-        assert!(!resolver.context(&dir.path().join("app")).generated);
+        assert_eq!(resolver.context(&dir.path().join("env")).marker, Some(DirKind::Dependency));
+        assert_eq!(resolver.context(&dir.path().join("app")).marker, None);
     }
 }

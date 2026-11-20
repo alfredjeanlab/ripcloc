@@ -183,69 +183,125 @@ impl Language {
         }
     }
 
-    /// Whether a directory with this name is skipped, such as build output and installed
-    /// dependencies. A name that only tools use is skipped at any depth, while a generic name such
-    /// as `build` is skipped only when `at_root` says that the directory is directly inside the
-    /// project's root, since that is where tools put it. A leading `*` matches any prefix.
-    pub fn excludes(self, name: &str, at_root: bool) -> bool {
-        let matches = |patterns: &[&str]| {
-            patterns.iter().any(|p| p.strip_prefix('*').map_or(name == *p, |s| name.ends_with(s)))
-        };
-        matches(self.excluded_dirs()) || at_root && matches(self.excluded_root_dirs())
+    /// Whether the directory `dir` named `name` is skipped, such as build output and installed
+    /// dependencies, where `at_root` says whether it is directly inside the project's root.
+    /// Dependency directories are counted when `deps` is set.
+    ///
+    /// A name that only tools use is skipped at any depth, and a name that is also common in
+    /// source is skipped only directly inside the project's root, since that is where tools put
+    /// it. A name such as `build` that source also uses there is skipped only when the directory
+    /// does not directly hold a file with one of the language's extensions, since tools put their
+    /// output for these names in subdirectories or in other formats, such as `build/lib/` in
+    /// Python and `log/development.log` in Ruby. Only a directory with such a name is read, so
+    /// the check costs the rest of the walk nothing.
+    pub fn skips(self, dir: &Path, name: &str, at_root: bool, deps: bool) -> bool {
+        self.skipped_dirs().iter().any(|SkippedDir(pattern, kind, place)| {
+            let matches =
+                pattern.strip_prefix('*').map_or(name == *pattern, |suffix| name.ends_with(suffix));
+            matches
+                && !(deps && *kind == DirKind::Dependency)
+                && match place {
+                    Place::Anywhere => true,
+                    Place::Root => at_root,
+                    Place::RootUnlessSource => at_root && !self.holds_source(dir),
+                }
+        })
     }
 
-    /// Directories that are skipped at any depth, whose names only tools use.
-    fn excluded_dirs(self) -> &'static [&'static str] {
+    /// Whether `dir` directly holds a file with one of the language's extensions.
+    fn holds_source(self, dir: &Path) -> bool {
+        let extensions = self.extensions();
+        names_in(dir).any(|name| {
+            Path::new(&name).extension().is_some_and(|e| extensions.iter().any(|x| e == *x))
+        })
+    }
+
+    /// The directories that the language's tools write. A leading `*` in a name matches any
+    /// prefix.
+    fn skipped_dirs(self) -> &'static [SkippedDir] {
+        use DirKind::{Dependency, Output};
+        use Place::{Anywhere, Root, RootUnlessSource};
         match self {
-            Self::JavaScript => &["node_modules", ".next"],
-            Self::Python => &[
-                ".venv",
-                "__pycache__",
-                ".mypy_cache",
-                ".pytest_cache",
-                ".ruff_cache",
-                "*.egg-info",
-                ".tox",
-                ".nox",
+            Self::Rust => &[SkippedDir("target", Output, Root)],
+            Self::Go => &[SkippedDir("vendor", Dependency, Root)],
+            // A bundler writes JavaScript straight into `dist/`, and a coverage report has
+            // scripts of its own, so their contents cannot tell them from source.
+            Self::JavaScript => &[
+                SkippedDir("node_modules", Dependency, Anywhere),
+                SkippedDir(".next", Output, Anywhere),
+                SkippedDir("dist", Output, Root),
+                SkippedDir("coverage", Output, Root),
+                SkippedDir("build", Output, RootUnlessSource),
             ],
-            Self::Rust
-            | Self::Go
-            | Self::Ruby
-            | Self::Dart
-            | Self::Swift
-            | Self::Jvm
-            | Self::Shell
-            | Self::Generic => &[],
-        }
-    }
-
-    /// Directories that are skipped only directly inside a project's root, whose names are also
-    /// common in source. A virtual environment is found by its `pyvenv.cfg` rather than by its
-    /// name, except for `venv`, since virtualenv before version 20 did not write one.
-    fn excluded_root_dirs(self) -> &'static [&'static str] {
-        match self {
-            Self::Rust => &["target"],
-            Self::Go => &["vendor"],
-            Self::JavaScript => &["dist", "build", "coverage"],
-            Self::Python => &["venv", "dist", "build"],
-            Self::Ruby => &["vendor", "tmp", "log", "coverage"],
-            Self::Dart => &["build"],
-            Self::Swift => &["build", "DerivedData", "Pods", "Carthage"],
-            Self::Jvm => &["build", "target"],
+            // A virtual environment is found by its `pyvenv.cfg` rather than by its name, except
+            // for `venv`, since virtualenv before version 20 did not write one.
+            Self::Python => &[
+                SkippedDir(".venv", Dependency, Anywhere),
+                SkippedDir("*.egg-info", Dependency, Anywhere),
+                SkippedDir("__pycache__", Output, Anywhere),
+                SkippedDir(".mypy_cache", Output, Anywhere),
+                SkippedDir(".pytest_cache", Output, Anywhere),
+                SkippedDir(".ruff_cache", Output, Anywhere),
+                SkippedDir(".tox", Output, Anywhere),
+                SkippedDir(".nox", Output, Anywhere),
+                SkippedDir("venv", Dependency, RootUnlessSource),
+                SkippedDir("dist", Output, RootUnlessSource),
+                SkippedDir("build", Output, RootUnlessSource),
+            ],
+            Self::Ruby => &[
+                SkippedDir("vendor", Dependency, Root),
+                SkippedDir("tmp", Output, RootUnlessSource),
+                SkippedDir("log", Output, RootUnlessSource),
+                SkippedDir("coverage", Output, RootUnlessSource),
+            ],
+            Self::Dart => &[SkippedDir("build", Output, RootUnlessSource)],
+            Self::Swift => &[
+                SkippedDir("Pods", Dependency, Root),
+                SkippedDir("Carthage", Dependency, Root),
+                SkippedDir("DerivedData", Output, Root),
+                SkippedDir("build", Output, RootUnlessSource),
+            ],
+            Self::Jvm => {
+                &[SkippedDir("target", Output, Root), SkippedDir("build", Output, RootUnlessSource)]
+            }
             Self::Shell | Self::Generic => &[],
         }
     }
 }
 
-/// Files whose presence marks their directory as generated, whatever its name and depth. A
+/// The name of a directory that a language's tools write, what it holds and where it is skipped.
+struct SkippedDir(&'static str, DirKind, Place);
+
+/// What a skipped directory holds.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum DirKind {
+    /// Installed third-party code, which `--deps` counts.
+    Dependency,
+    /// Build output or a cache, which is never counted.
+    Output,
+}
+
+/// Where a directory with a skipped name is skipped.
+#[derive(Clone, Copy)]
+enum Place {
+    Anywhere,
+    /// Directly inside the project's root.
+    Root,
+    /// Directly inside the project's root, when it does not directly hold a source file.
+    RootUnlessSource,
+}
+
+/// Files whose presence marks what their directory holds, whatever its name and depth. A
 /// `CACHEDIR.TAG` follows the Cache Directory Tagging specification, and Cargo, pytest and ruff
 /// write one into their output. A `pyvenv.cfg` marks a Python virtual environment.
-const GENERATED_MARKERS: &[&str] = &["CACHEDIR.TAG", "pyvenv.cfg"];
+const MARKERS: &[(&str, DirKind)] =
+    &[("CACHEDIR.TAG", DirKind::Output), ("pyvenv.cfg", DirKind::Dependency)];
 
-/// Whether a directory whose entries are `names` holds generated files, such as build output or a
-/// virtual environment.
-pub fn is_generated(names: &[String]) -> bool {
-    names.iter().any(|n| GENERATED_MARKERS.contains(&n.as_str()))
+/// What a directory whose entries are `names` holds, when a marker file in it says so. Output wins
+/// over a dependency, since output is never counted.
+pub fn marker(names: &[String]) -> Option<DirKind> {
+    let found = |kind| MARKERS.iter().any(|(m, k)| *k == kind && names.iter().any(|n| n == m));
+    [DirKind::Output, DirKind::Dependency].into_iter().find(|kind| found(*kind))
 }
 
 /// Classifies paths as source or test.
@@ -481,27 +537,55 @@ mod tests {
         assert_eq!(Language::detect_nested(&names(dir.path())), Some(Language::Python));
     }
 
-    #[test]
-    fn excludes_match_names_and_suffixes() {
-        assert!(Language::Python.excludes("my_pkg.egg-info", false));
-        assert!(Language::JavaScript.excludes("node_modules", false));
-        assert!(!Language::Rust.excludes("src", true));
+    fn skips(language: Language, name: &str, at_root: bool, deps: bool) -> bool {
+        let dir = tempfile::tempdir().unwrap();
+        language.skips(&dir.path().join(name), name, at_root, deps)
     }
 
     #[test]
-    fn generic_names_are_excluded_only_at_the_root() {
-        assert!(Language::Python.excludes("build", true));
-        assert!(!Language::Python.excludes("build", false));
-        assert!(!Language::Python.excludes("env", true));
-        assert!(Language::Rust.excludes("target", true));
-        assert!(!Language::Rust.excludes("target", false));
+    fn skips_match_names_and_suffixes() {
+        assert!(skips(Language::Python, "my_pkg.egg-info", false, false));
+        assert!(skips(Language::JavaScript, "node_modules", false, false));
+        assert!(!skips(Language::Rust, "src", true, false));
     }
 
     #[test]
-    fn markers_make_a_directory_generated() {
+    fn generic_names_are_skipped_only_at_the_root() {
+        assert!(skips(Language::Python, "build", true, false));
+        assert!(!skips(Language::Python, "build", false, false));
+        assert!(!skips(Language::Python, "env", true, false));
+        assert!(skips(Language::Rust, "target", true, false));
+        assert!(!skips(Language::Rust, "target", false, false));
+    }
+
+    #[test]
+    fn deps_count_dependencies_but_not_output() {
+        assert!(!skips(Language::JavaScript, "node_modules", false, true));
+        assert!(!skips(Language::Go, "vendor", true, true));
+        assert!(skips(Language::Rust, "target", true, true));
+        assert!(skips(Language::Python, "__pycache__", false, true));
+    }
+
+    #[test]
+    fn a_generic_name_that_holds_source_is_counted() {
+        let dir = tempfile::tempdir().unwrap();
+        let build = dir.path().join("build");
+        std::fs::create_dir_all(build.join("lib")).unwrap();
+        assert!(Language::Python.skips(&build, "build", true, false));
+        std::fs::write(build.join("core.py"), "").unwrap();
+        assert!(!Language::Python.skips(&build, "build", true, false));
+        let dist = dir.path().join("dist");
+        std::fs::create_dir_all(&dist).unwrap();
+        std::fs::write(dist.join("index.js"), "").unwrap();
+        assert!(Language::JavaScript.skips(&dist, "dist", true, false));
+    }
+
+    #[test]
+    fn markers_say_what_a_directory_holds() {
         let names = |n: &[&str]| n.iter().map(|s| (*s).to_owned()).collect::<Vec<_>>();
-        assert!(is_generated(&names(&["bin", "lib", "pyvenv.cfg"])));
-        assert!(is_generated(&names(&["CACHEDIR.TAG", "debug"])));
-        assert!(!is_generated(&names(&["__init__.py", "settings.py"])));
+        assert_eq!(marker(&names(&["bin", "lib", "pyvenv.cfg"])), Some(DirKind::Dependency));
+        assert_eq!(marker(&names(&["CACHEDIR.TAG", "debug"])), Some(DirKind::Output));
+        assert_eq!(marker(&names(&["pyvenv.cfg", "CACHEDIR.TAG"])), Some(DirKind::Output));
+        assert_eq!(marker(&names(&["__init__.py", "settings.py"])), None);
     }
 }

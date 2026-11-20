@@ -1,94 +1,46 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 Alfred Jean LLC
 
-//! `ripcloc`, which quickly counts lines of code by language.
+//! `ripcloc`, which counts lines of code very fast.
 
+mod args;
 mod cfg_test;
 mod cloc;
+mod color;
 mod lang;
 mod packages;
 mod project;
 
-use std::collections::{BTreeMap, HashMap, HashSet};
+use std::collections::{BTreeMap, HashMap};
+use std::fmt::Write as _;
 use std::fs::File;
-use std::io::Read;
+use std::io::{self, ErrorKind, Read, Write};
 use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex, PoisonError};
 
-use clap::{Parser, ValueEnum};
 use ignore::{WalkBuilder, WalkState};
 use serde_json::{Map, Value, json};
 
+use args::{Args, Format};
 use cloc::LineCounts;
-use lang::Classifier;
+use lang::{Classifier, DirKind, Language};
 use project::Resolver;
-
-/// Quickly counts lines of code by language
-#[derive(Parser)]
-#[command(version, about)]
-struct Args {
-    /// Files and directories to count
-    #[arg(value_name = "PATH", default_value = ".")]
-    paths: Vec<PathBuf>,
-
-    /// Maximum directory depth to traverse
-    #[arg(long, default_value_t = 100)]
-    max_depth: usize,
-
-    /// Levels of breakdown under each language. The first is the top-level directories and the
-    /// workspace's own packages, and each level after it lists the packages of a workspace nested
-    /// in the level above [default: 1, or 0 for documentation and configuration formats when there
-    /// are many languages]
-    #[arg(long)]
-    depth: Option<usize>,
-
-    /// Count files of any size. Without it, files over 1 GiB are skipped
-    #[arg(long, conflicts_with = "no_large")]
-    large: bool,
-
-    /// Skip files over 10 MB, such as generated code and data
-    #[arg(long, conflicts_with = "large")]
-    no_large: bool,
-
-    /// Skip files larger than this many megabytes
-    #[arg(long, value_name = "MB", conflicts_with_all = ["large", "no_large"])]
-    max_file_size: Option<u64>,
-
-    /// Respect `.gitignore`, `.ignore` and git's exclude files [default]
-    #[arg(long, conflicts_with = "no_ignore")]
-    ignore: bool,
-
-    /// Count files that `.gitignore`, `.ignore` and git's exclude files leave out. Hidden files
-    /// are still skipped, and so are build and dependency directories, such as `target/` directly
-    /// inside a Rust project or any directory that holds a `pyvenv.cfg` or `CACHEDIR.TAG`
-    #[arg(long, conflicts_with = "ignore")]
-    no_ignore: bool,
-
-    /// Output format
-    #[arg(short, long, value_enum, default_value_t = Format::Text)]
-    output: Format,
-
-    /// Attribute each language's lines to source or tests [default]
-    #[arg(long, conflicts_with = "no_attribution")]
-    attribution: bool,
-
-    /// Count each language as one row, without telling source from tests, which is faster
-    #[arg(long, conflicts_with = "attribution")]
-    no_attribution: bool,
-}
-
-#[derive(Clone, Copy, PartialEq, Eq, ValueEnum)]
-enum Format {
-    Text,
-    Json,
-}
 
 /// The version of the JSON report's shape. It changes only when a field is removed or changes
 /// meaning, never when counts change or a field is added.
 const SCHEMA: u32 = 1;
 
-/// The label of the files outside every package.
+/// The label of the files outside every package, and of the small rows folded into them.
 const REST: &str = "\u{2026}";
+
+/// The smallest share of its parent's lines, in percent, that a breakdown row has without a
+/// `--depth`. A smaller row is folded into [`REST`].
+const MIN_SHARE_PERCENT: usize = 2;
+
+/// The smallest share of the report's lines, in percent, that a row has to be broken down without
+/// a `--depth`. A smaller language is one row.
+const MIN_LANGUAGE_PERCENT: usize = 1;
 
 /// The rows of the report, by language name and kind.
 type Rows = HashMap<(String, Kind), Row>;
@@ -116,9 +68,14 @@ impl Stats {
         self.lines.add(other.lines);
     }
 
+    fn line_count(&self) -> usize {
+        let LineCounts { blank, comment, code } = self.lines;
+        blank + comment + code
+    }
+
     fn json(&self) -> Map<String, Value> {
         let LineCounts { blank, comment, code } = self.lines;
-        let lines = blank + comment + code;
+        let lines = self.line_count();
         let fields = [
             ("files", self.files),
             ("lines", lines),
@@ -131,7 +88,7 @@ impl Stats {
 
     fn text(&self, label: &str, width: usize) -> String {
         let LineCounts { blank, comment, code } = self.lines;
-        let lines = blank + comment + code;
+        let lines = self.line_count();
         format!(
             "{label:<width$} {:>5}  {lines:>8}  {blank:>8}  {comment:>8}  {code:>8}",
             self.files
@@ -167,10 +124,11 @@ impl Row {
     /// Each level lists the labels below the row above it, then [`REST`] for the files that are
     /// in none of them, so that the rows at each level add up to the row above. A list of one row
     /// repeats the row above it, so it is left out unless `single` keeps it to show where the
-    /// row's files are.
-    fn breakdown(&self, depth: usize, single: bool) -> Vec<(usize, &str, Stats)> {
+    /// row's files are. With `fold`, a row with less than [`MIN_SHARE_PERCENT`] of the lines of
+    /// the row above it is folded into [`REST`].
+    fn breakdown(&self, depth: usize, single: bool, fold: bool) -> Vec<(usize, &str, Stats)> {
         let mut lines = Vec::new();
-        self.level(&[], depth, single, &mut lines);
+        self.level(&[], depth, single, fold, &mut lines);
         lines
     }
 
@@ -179,6 +137,7 @@ impl Row {
         prefix: &[&'a str],
         depth: usize,
         single: bool,
+        fold: bool,
         lines: &mut Vec<(usize, &'a str, Stats)>,
     ) {
         if prefix.len() >= depth {
@@ -196,23 +155,41 @@ impl Row {
                 None => rest.add(*stats),
             }
         }
-        if children.is_empty() || (!single && children.len() + usize::from(rest.files > 0) < 2) {
+        if fold {
+            let parent =
+                rest.line_count() + children.values().map(Stats::line_count).sum::<usize>();
+            children.retain(|_, stats| {
+                let keep = stats.line_count() * 100 >= parent * MIN_SHARE_PERCENT;
+                if !keep {
+                    rest.add(*stats);
+                }
+                keep
+            });
+        }
+        // The lines of inline tests make a row without files.
+        let has_rest = rest.files > 0 || rest.line_count() > 0;
+        if children.is_empty() || (!single && children.len() + usize::from(has_rest) < 2) {
             return;
         }
         for (label, stats) in children {
             lines.push((prefix.len() + 1, label, stats));
             let mut next = prefix.to_vec();
             next.push(label);
-            self.level(&next, depth, single, lines);
+            self.level(&next, depth, single, fold, lines);
         }
-        if rest.files > 0 {
+        if has_rest {
             lines.push((prefix.len() + 1, REST, rest));
         }
     }
 }
 
 fn main() -> anyhow::Result<()> {
-    let args = Args::parse();
+    let mut args = Args::parse();
+    // The listing of `--languages` belongs here, before any path is read.
+    if args.compact {
+        args.no_attribution = true;
+        args.depth = args.depth.or(Some(0));
+    }
 
     // Paths are compared in their canonical form, so that a path inside another, or one path
     // given twice in different forms, is counted once. A directory is walked as it is given,
@@ -260,14 +237,23 @@ fn main() -> anyhow::Result<()> {
     };
 
     // A few files are counted on this thread, since starting the walker's threads takes longer.
-    let rows = if paths.len() <= DIRECT_FILES
+    let (rows, unreadable) = if paths.len() <= DIRECT_FILES
         && types.iter().all(|t| t.as_ref().is_ok_and(|t| t.is_file()))
     {
-        let (mut rows, mut buffer) = (Rows::new(), Vec::new());
+        let (mut rows, mut unreadable, mut buffer) = (Rows::new(), 0, Vec::new());
         for path in &paths {
-            count_file(path, max_bytes, !args.no_attribution, &resolver, &mut rows, &mut buffer);
+            let attribute = !args.no_attribution;
+            count_file(
+                path,
+                max_bytes,
+                attribute,
+                &resolver,
+                &mut rows,
+                &mut unreadable,
+                &mut buffer,
+            );
         }
-        rows
+        (rows, unreadable)
     } else {
         walk(&paths, &args, &resolver, max_bytes)
     };
@@ -289,6 +275,8 @@ fn main() -> anyhow::Result<()> {
     total.add(code);
     total.add(other);
 
+    // The report is written at once, so that a reader that closes early is handled in one place.
+    let mut out = String::new();
     match args.output {
         Format::Json => {
             let languages: Vec<Value> = sorted
@@ -325,18 +313,23 @@ fn main() -> anyhow::Result<()> {
                 json!({ "source": source.json(), "test": test.json(), "other": other.json(), "total": total.json() })
             };
             let report = json!({ "schema": SCHEMA, "attribution": !args.no_attribution, "languages": languages, "totals": totals });
-            println!("{}", serde_json::to_string_pretty(&report)?);
+            writeln!(out, "{}", serde_json::to_string_pretty(&report)?)?;
         }
-        Format::Text if sorted.is_empty() => println!("No source files found."),
+        // Unreadable files are skipped without a warning, since warnings would bury the report,
+        // so they are mentioned only when there is no report for a warning to bury.
+        Format::Text if sorted.is_empty() => match unreadable {
+            0 => writeln!(out, "No source files found.")?,
+            1 => writeln!(out, "No source files found (skipped 1 unreadable file).")?,
+            n => writeln!(out, "No source files found (skipped {n} unreadable files).")?,
+        },
         Format::Text => {
-            // With many languages and no `--depth`, the formats that are not split into source and
-            // tests are one number each.
-            let languages: HashSet<&str> = rows.keys().map(|(name, _)| name.as_str()).collect();
-            let other_depth = match args.depth {
-                None if languages.len() >= 4 => 0,
-                depth => depth.unwrap_or(1),
-            };
+            // Without a `--depth`, the formats that are not split into source and tests are one
+            // number each, small rows are folded together, a breakdown of one row is left out
+            // because it repeats the row above it, and a language with little of the report's code
+            // is not broken down.
+            let other_depth = args.depth.unwrap_or(0);
             let depth = args.depth.unwrap_or(1);
+            let fold = args.depth.is_none();
             // Each line is (depth, label, stats).
             let mut lines = Vec::new();
             // Source is only called source when the language has tests to tell it from.
@@ -348,60 +341,75 @@ fn main() -> anyhow::Result<()> {
                     Kind::Source | Kind::Code | Kind::Other => name.clone(),
                 };
                 lines.push((0, label, row.stats));
+                let small =
+                    row.stats.line_count() * 100 < total.line_count() * MIN_LANGUAGE_PERCENT;
                 let parts = match kind {
-                    Kind::Other => row.breakdown(other_depth, false),
-                    Kind::Source | Kind::Test | Kind::Code => row.breakdown(depth, true),
+                    _ if fold && small => Vec::new(),
+                    Kind::Other => row.breakdown(other_depth, false, fold),
+                    Kind::Source | Kind::Test | Kind::Code => row.breakdown(depth, !fold, fold),
                 };
                 lines.extend(parts.into_iter().map(|(d, l, s)| (d, l.to_string(), s)));
             }
             // The label column is wide enough for the longest label, and at least 25.
             let width =
                 lines.iter().map(|(d, l, ..)| 2 * d + l.chars().count()).fold(25, usize::max);
-            let rule = "\u{2500}".repeat(width + 47);
+            let on = color::enabled();
+            let rule = color::paint(on, color::CONTEXT, &"\u{2500}".repeat(width + 47));
             let header = format!(
                 "{:<width$} {:>5}  {:>8}  {:>8}  {:>8}  {:>8}",
                 "Language", "files", "lines", "blank", "comment", "code"
             );
-            println!("{rule}\n{header}\n{rule}");
+            writeln!(out, "{rule}\n{}\n{rule}", color::paint(on, color::HEADER, &header))?;
             for (depth, label, stats) in &lines {
                 let indent = "  ".repeat(*depth);
                 let line = format!("{indent}{}", stats.text(label, width - indent.len()));
-                println!("{line}");
+                // The rows that break down the row above them are lighter than it.
+                let line = if *depth > 0 { color::paint(on, color::LITERAL, &line) } else { line };
+                writeln!(out, "{line}")?;
             }
             // Without attribution, code and other formats are only totaled apart when there are both.
             if !args.no_attribution {
-                println!(
+                writeln!(
+                    out,
                     "{rule}\n{}\n{}",
-                    source.text("Source total", width),
-                    test.text("Test total", width)
-                );
+                    source.text("Total source", width),
+                    test.text("Total tests", width)
+                )?;
                 if other.files > 0 {
-                    println!("{}", other.text("Other total", width));
+                    writeln!(out, "{}", other.text("Total other", width))?;
                 }
             } else if code.files > 0 && other.files > 0 {
-                println!(
+                writeln!(
+                    out,
                     "{rule}\n{}\n{}",
-                    code.text("Code total", width),
-                    other.text("Other total", width)
-                );
+                    code.text("Total code", width),
+                    other.text("Total other", width)
+                )?;
             }
-            println!("{rule}\n{}\n{rule}", total.text("Total", width));
+            writeln!(out, "{rule}\n{}\n{rule}", total.text("Total", width))?;
         }
     }
-    Ok(())
+    let mut stdout = std::io::stdout().lock();
+    match stdout.write_all(out.as_bytes()).and_then(|()| stdout.flush()) {
+        // A reader that stops early, such as `head`, has read all that it wanted.
+        Err(e) if e.kind() == ErrorKind::BrokenPipe => Ok(()),
+        written => Ok(written?),
+    }
 }
 
 /// The most paths that are counted without the walker when every one is a file.
 const DIRECT_FILES: usize = 8;
 
-/// Count the files under `paths` on the walker's threads.
-fn walk(paths: &[PathBuf], args: &Args, resolver: &Arc<Resolver>, max_bytes: u64) -> Rows {
-    let Some((first, rest)) = paths.split_first() else { return Rows::new() };
+/// Count the files under `paths` on the walker's threads, and return the rows with the number of
+/// files that could not be read.
+fn walk(paths: &[PathBuf], args: &Args, resolver: &Arc<Resolver>, max_bytes: u64) -> (Rows, usize) {
+    let Some((first, rest)) = paths.split_first() else { return (Rows::new(), 0) };
     let mut builder = WalkBuilder::new(first);
     for path in rest {
         builder.add(path);
     }
     let filter_resolver = Arc::clone(resolver);
+    let deps = args.deps;
     if args.no_ignore {
         builder.ignore(false).git_ignore(false).git_global(false).git_exclude(false).parents(false);
     }
@@ -412,18 +420,32 @@ fn walk(paths: &[PathBuf], args: &Args, resolver: &Arc<Resolver>, max_bytes: u64
         };
         let name = e.file_name().to_string_lossy();
         let context = filter_resolver.context(parent);
-        // The directory's own context is resolved last, since that reads it, which is wasted on a
-        // directory that its name already excludes.
-        name != "node_modules"
-            && !context.language.excludes(&name, *context.project == *parent)
-            && !context.root_language.excludes(&name, *context.root == *parent)
-            && !filter_resolver.context(e.path()).generated
+        let skips =
+            |language: Language, at_root: bool| language.skips(e.path(), &name, at_root, deps);
+        // A `node_modules` is skipped whatever the language of the project that holds it. The
+        // directory's own context is resolved last, since that reads it, which is wasted on a
+        // directory that its name already skips.
+        !(name == "node_modules" && !deps)
+            && !skips(context.language, *context.project == *parent)
+            && !skips(context.root_language, *context.root == *parent)
+            && match filter_resolver.context(e.path()).marker {
+                Some(DirKind::Output) => false,
+                Some(DirKind::Dependency) => deps,
+                None => true,
+            }
     });
 
     // Each thread counts into rows of its own, which are merged when the walk drops it.
     let rows = Mutex::new(Rows::new());
+    let unreadable = AtomicUsize::new(0);
     builder.build_parallel().run(|| {
-        let mut local = ThreadRows { rows: Rows::new(), buffer: Vec::new(), merged: &rows };
+        let mut local = ThreadRows {
+            rows: Rows::new(),
+            unreadable: 0,
+            buffer: Vec::new(),
+            merged: &rows,
+            merged_unreadable: &unreadable,
+        };
         let attribute = !args.no_attribution;
         Box::new(move |entry| {
             // Only regular files are opened, since opening a FIFO could block.
@@ -436,20 +458,24 @@ fn walk(paths: &[PathBuf], args: &Args, resolver: &Arc<Resolver>, max_bytes: u64
                     attribute,
                     resolver,
                     &mut local.rows,
+                    &mut local.unreadable,
                     &mut local.buffer,
                 );
             }
             WalkState::Continue
         })
     });
-    rows.into_inner().unwrap_or_else(PoisonError::into_inner)
+    (rows.into_inner().unwrap_or_else(PoisonError::into_inner), unreadable.into_inner())
 }
 
-/// The rows that one walker thread counts into, and a buffer it reads files into.
+/// The rows and the number of unreadable files that one walker thread counts into, and a buffer
+/// that it reads files into.
 struct ThreadRows<'a> {
     rows: Rows,
+    unreadable: usize,
     buffer: Vec<u8>,
     merged: &'a Mutex<Rows>,
+    merged_unreadable: &'a AtomicUsize,
 }
 
 impl Drop for ThreadRows<'_> {
@@ -458,6 +484,7 @@ impl Drop for ThreadRows<'_> {
         for (key, row) in std::mem::take(&mut self.rows) {
             merged.entry(key).or_default().merge(row);
         }
+        self.merged_unreadable.fetch_add(self.unreadable, Ordering::Relaxed);
     }
 }
 
@@ -480,7 +507,7 @@ fn sort_rows(rows: &Rows) -> Vec<(&(String, Kind), &Row)> {
 }
 
 /// Count one walked file into `rows`, if it is a text file of a counted type and at most
-/// `max_bytes`.
+/// `max_bytes`, or add one to `unreadable` if the file cannot be read.
 ///
 /// Without `attribute`, the file's language is one row, and no time is spent on telling tests apart.
 fn count_file(
@@ -489,6 +516,7 @@ fn count_file(
     attribute: bool,
     resolver: &Resolver,
     rows: &mut Rows,
+    unreadable: &mut usize,
     buffer: &mut Vec<u8>,
 ) {
     let mut key = cloc::file_key(path);
@@ -496,8 +524,14 @@ fn count_file(
     if script && is_never_script(path) || !script && !cloc::is_counted(&key) {
         return;
     }
-    // Skip an unreadable file quietly, since warnings would bury the report.
-    let Some(content) = read(path, max_bytes, script, buffer) else { return };
+    let content = match read(path, max_bytes, script, buffer) {
+        Ok(Some(content)) => content,
+        Ok(None) => return,
+        Err(_) => {
+            *unreadable += 1;
+            return;
+        }
+    };
     if script {
         let start = content.get(..SHEBANG_PREFIX).unwrap_or(content);
         let Some(shebang) = cloc::shebang_key(start).filter(|k| cloc::is_counted(k)) else {
@@ -556,7 +590,8 @@ fn count_file(
     }
 }
 
-/// The content of the regular file at `path`, if it is at most `max_bytes`.
+/// The content of the regular file at `path`, if it is at most `max_bytes`, or the error if the
+/// file cannot be opened or read.
 ///
 /// The size comes from the open file, so a file is stat'ed once, and the content is read up to
 /// that size, so a file that grows while it is read is cut at the size it had when opened. With
@@ -567,12 +602,12 @@ fn read<'a>(
     max_bytes: u64,
     script: bool,
     buffer: &'a mut Vec<u8>,
-) -> Option<&'a [u8]> {
-    let mut file = File::open(path).ok()?;
-    let metadata = file.metadata().ok()?;
+) -> io::Result<Option<&'a [u8]>> {
+    let mut file = File::open(path)?;
+    let metadata = file.metadata()?;
     let len = metadata.len();
     if !metadata.is_file() || len > max_bytes {
-        return None;
+        return Ok(None);
     }
     // A buffer that held a large file is not kept for the files after it.
     if buffer.capacity() > LARGE_BUFFER {
@@ -581,15 +616,16 @@ fn read<'a>(
     buffer.clear();
     // Reading through `take` stops at `len` without another read call to find the end.
     if script {
-        (&mut file).take(len.min(SHEBANG_PREFIX as u64)).read_to_end(buffer).ok()?;
+        (&mut file).take(len.min(SHEBANG_PREFIX as u64)).read_to_end(buffer)?;
         if !buffer.starts_with(b"#!") {
-            return None;
+            return Ok(None);
         }
     }
     let rest = len - buffer.len() as u64;
-    buffer.reserve_exact(usize::try_from(rest).ok()?);
-    file.take(rest).read_to_end(buffer).ok()?;
-    Some(buffer)
+    let Ok(rest_bytes) = usize::try_from(rest) else { return Ok(None) };
+    buffer.reserve_exact(rest_bytes);
+    file.take(rest).read_to_end(buffer)?;
+    Ok(Some(buffer))
 }
 
 /// Whether the file at `path`, which has no extension, is named like a file that is never a

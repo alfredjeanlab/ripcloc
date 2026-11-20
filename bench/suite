@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Benchmarks ripcloc against other line counters, in the manner of ripgrep's benchsuite.
+"""Benchmarks ripcloc against tokei, scc and cloc, in the manner of ripgrep's benchsuite.
 
     bench/suite --dir <corpora> --download                  # about 7 GB
     bench/suite --dir <corpora> --raw <run>/raw.csv | tee <run>/summary
