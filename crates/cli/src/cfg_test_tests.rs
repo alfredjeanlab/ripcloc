@@ -3,6 +3,51 @@
 
 use super::*;
 
+/// The inline test modules of a Rust source file.
+struct CfgTestInfo {
+    /// Line ranges (0-indexed) of `#[cfg(test)] mod` blocks, from the attribute through the
+    /// closing brace.
+    test_ranges: Vec<Range<usize>>,
+}
+
+impl CfgTestInfo {
+    /// Find the test modules of `content`, and check that they are the same whether lexing skips
+    /// to the lines that counting pushes or lexes every line.
+    fn parse(content: &(impl AsRef<[u8]> + ?Sized)) -> Self {
+        let content = content.as_ref();
+        let mut code_starts = Vec::new();
+        cloc::count_in(content, "rs", Some(&mut code_starts));
+        let spans = test_spans(content, &[]);
+        assert_eq!(test_spans(content, &code_starts), spans);
+        // The index of the line that starts at `offset`, or of the line after the last at the end.
+        let line = |offset: usize| {
+            let unterminated = offset == content.len() && !content.ends_with(b"\n");
+            memchr_iter(b'\n', content.get(..offset).unwrap_or_default()).count()
+                + usize::from(unterminated)
+        };
+        Self { test_ranges: spans.into_iter().map(|s| line(s.start)..line(s.end)).collect() }
+    }
+
+    fn is_test_line(&self, line_idx: usize) -> bool {
+        self.test_ranges.iter().any(|r| r.contains(&line_idx))
+    }
+}
+
+/// The line ranges (0-indexed) of the inline test modules of a Rust source file.
+fn test_ranges(content: &[u8]) -> Vec<Range<usize>> {
+    CfgTestInfo::parse(content).test_ranges
+}
+
+/// The counts of `content` and of its test modules, found by lexing every line.
+fn counted_alone(content: &str) -> (LineCounts, LineCounts) {
+    let content = content.strip_prefix('\u{feff}').unwrap_or(content);
+    let mut test = LineCounts::default();
+    for span in test_spans(content.as_bytes(), &[]) {
+        test.add(cloc::count_lines(&content[span], "rs"));
+    }
+    (cloc::count_lines(content, "rs"), test)
+}
+
 #[test]
 fn basic_cfg_test_block() {
     let content = r#"
@@ -882,4 +927,57 @@ fn attributes_inside_strings_on_one_line_are_not_detected() {
 fn nested_block_comments_hide_test_modules() {
     let content = "/* a /* b */ \"\n#[cfg(test)]\nmod tests {\n}\n*/\nfn f() {}\n";
     assert!(CfgTestInfo::parse(content).test_ranges.is_empty());
+}
+
+#[yare::parameterized(
+    strings_with_braces = { "fn a() {}\n\n#[cfg(test)]\nmod tests {\n    const S: &str = \"}\n// {\";\n    const C: char = '}';\n    const R: &str = r#\"}\"#;\n    /* } */\n}\n\nfn b() {}\n" },
+    crlf = { "fn a() {}\r\n\r\n#[cfg(test)]\r\nmod tests {\r\n    // a comment\r\n\r\n    fn t() {}\r\n}\r\n\r\nfn b() {}\r\n" },
+    unterminated = { "fn a() {}\n#[cfg(test)]\nmod tests {\n    fn t() {\n    }\n" },
+    without_a_final_newline = { "fn a() {}\n#[cfg(test)]\nmod tests {\n    fn t() {}\n}" },
+    blank_lines_after_the_module = { "#[cfg(test)]\nmod tests {\n}\n\n\n\n// after\nfn a() {}\n\n" },
+    adjacent_modules = { "#[cfg(test)]\nmod a {\n}\n#[cfg(test)]\nmod b {\n    // b\n}\n" },
+    nested_modules = { "#[cfg(test)]\nmod tests {\n    mod inner {\n        fn t() {}\n    }\n\n    /* a\n    } */\n}\nfn a() {}\n" },
+    multiline_attribute = { "fn a() {}\n#[cfg(\n    test\n)]\n// between\nmod tests {\n}\n" },
+    declared_without_a_body = { "#[cfg(test)]\nmod tests;\n#[cfg(test)]\nmod inline {\n}\n" },
+    items_that_are_not_modules = { "#[cfg(test)]\nfn helper() {\n}\n#[cfg(test)]\nmod tests {\n}\n" },
+    byte_order_mark = { "\u{feff}#[cfg(test)]\nmod tests {\n    fn t() {}\n}\nfn a() {}\n" },
+    starting_inside_a_comment = { "/* a\n*/ #[cfg(test)]\nmod tests {\n    fn t() {}\n}\nfn a() {}\n" },
+    starting_inside_a_string = { "const S: &str = \"a\n\"; #[cfg(test)]\nmod tests {\n    const T: &str = \"b\";\n}\nfn a() {}\n" },
+    starting_after_code = { "#[derive(Debug)]\nstruct S; #[cfg(test)]\nmod tests {\n}\n" },
+    attribute_in_a_doc_comment = { "/// #[cfg(test)]\n/// mod tests {\n/// }\nfn a() {}\n#[cfg(test)]\nmod tests {\n}\n" },
+    without_modules = { "fn a() {}\n// cfg(test)\n" },
+    split_after_the_hash = { "let a = \"#\"; #/* a */[cfg(test)]\nmod tests {\n}\n" },
+    split_twice = { "#[c/* a */f/* b *//* c */g(test)]\nmod tests {\n}\n" },
+    split_by_a_string = { "#[cf\"\"g(test)]\nmod tests {\n}\n" },
+    split_by_a_raw_string = { "let s = r#\"a\"#[cfg(test)]\nmod tests {\n}\n" },
+    split_by_a_string_with_a_comment = { "#[cf\"\"g(test)]\nmod tests {\n    /* a */\n}\n" },
+    followed_by_code = { "#[cfg(test)]\nmod tests {\n}\nfn a() {}\n" },
+    followed_by_a_string = { "#[cfg(test)]\nmod tests {\n}\nconst S: &str = \"a\";\n" },
+    ending_inside_a_comment = { "#[cfg(test)]\nmod tests {\n} /* a\n*/\nfn a() {}\n" },
+    block_comments_on_plain_lines = { "#[cfg(unix)]\nfn a() {}\n/* a\n#[cfg(test)]\nmod hidden {\n}\n*/\n#[cfg(test)]\nmod tests {\n}\n" },
+)]
+fn skipping_to_code_starts_counts_as_lexing_every_line(content: &str) {
+    assert_eq!(count(content.as_bytes()), counted_alone(content));
+    CfgTestInfo::parse(content);
+}
+
+#[test]
+fn test_counts_hold_the_lines_of_test_modules() {
+    let content =
+        "fn a() {}\n\n#[cfg(test)]\nmod tests {\n    // \"{\n\n    fn t() {}\n}\n\nfn b() {}\n";
+    let (counts, test) = count(content.as_bytes());
+    assert_eq!(counts, LineCounts { blank: 3, comment: 1, code: 6 });
+    assert_eq!(test, LineCounts { blank: 1, comment: 1, code: 4 });
+}
+
+#[test]
+fn unterminated_test_modules_are_not_tests() {
+    let content = "fn a() {}\n#[cfg(test)]\nmod tests {\n    fn t() {\n    }\n";
+    assert_eq!(count(content.as_bytes()).1, LineCounts::default());
+}
+
+#[test]
+fn crlf_test_modules_have_the_ranges_of_lf_ones() {
+    let content = "fn a() {}\r\n\r\n#[cfg(test)]\r\nmod tests {\r\n    fn t() {}\r\n}\r\n";
+    assert_eq!(CfgTestInfo::parse(content).test_ranges, vec![2..6]);
 }

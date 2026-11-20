@@ -38,6 +38,9 @@ pub struct Context {
     pub chain: Arc<[Arc<str>]>,
     /// Whether the directory holds a file that marks it as generated, such as a `pyvenv.cfg`.
     pub generated: bool,
+    /// The root and label of the outermost Go module with more than one package that encloses
+    /// the directory, whose directories with `.go` files are each a package.
+    pub go_module: Option<(Arc<Path>, Arc<str>)>,
 }
 
 /// A package's name, and the group of the project that declares it.
@@ -82,13 +85,33 @@ impl Resolver {
         };
         let root: Arc<Path> = parent.as_ref().map_or_else(|| dir.into(), |p| Arc::clone(&p.root));
         let label: Arc<str> = dir.strip_prefix(&root).unwrap_or(dir).to_string_lossy().into();
-        let mut declares = false;
+        // A Go module declares its packages when it has more than one, and the outermost such
+        // module names them.
+        let mut declares = language == Some(Language::Go) && packages::go_has_packages(dir);
+        let go_module = match parent.as_ref().and_then(|p| p.go_module.clone()) {
+            Some(module) => Some(module),
+            None if declares => Some((dir.into(), Arc::clone(&label))),
+            None => None,
+        };
+        if let Some((module_root, module_label)) = &go_module
+            && names.iter().any(|n| Path::new(n).extension().is_some_and(|e| e == "go"))
+            && !dir.strip_prefix(module_root).is_ok_and(|r| r.iter().any(|c| c == "vendor"))
+        {
+            let name: Arc<str> = if dir == &**module_root {
+                ".".into()
+            } else {
+                dir.file_name().unwrap_or(dir.as_os_str()).to_string_lossy().into()
+            };
+            lock(&self.packages)
+                .entry(dir.to_path_buf())
+                .or_insert_with(|| (name, Arc::clone(module_label)));
+        }
         if let Some(language) = language {
             let found = packages::detect(dir, language);
-            let own_name = (parent.is_some() && found.is_empty())
+            let own_name = (parent.is_some() && found.is_empty() && !declares)
                 .then(|| packages::manifest_name(dir, language))
                 .flatten();
-            declares = !found.is_empty() || own_name.is_some();
+            declares |= !found.is_empty() || own_name.is_some();
             let mut names = lock(&self.packages);
             for package in found {
                 let path =
@@ -132,6 +155,7 @@ impl Resolver {
                     group,
                     chain,
                     generated,
+                    go_module,
                 }
             }
             (Some(parent), language) => Context {
@@ -143,6 +167,7 @@ impl Resolver {
                 group,
                 chain,
                 generated,
+                go_module,
             },
         });
         Arc::clone(lock(&self.contexts).entry(dir.to_path_buf()).or_insert(context))
@@ -241,6 +266,29 @@ mod tests {
         assert_eq!(group("engine/fixtures"), "engine");
         assert_eq!(group("tool/src"), "tool");
         assert_eq!(group("scripts"), "");
+    }
+
+    #[test]
+    fn go_directories_are_packages_of_the_outermost_module() {
+        let dir = tree(&[
+            "go.mod=module example.com/k\\n",
+            "main.go",
+            "pkg/util/u.go",
+            "pkg/util/vendor/v/v.go",
+            "staging/api/go.mod=module example.com/api\\n",
+            "staging/api/core/c.go",
+            "staging/lone/go.mod=module example.com/lone\\n",
+        ]);
+        let resolver = Resolver::new([dir.path().to_path_buf()]);
+        let at = |sub: &str| {
+            let context = resolver.context(&dir.path().join(sub));
+            (context.package.as_deref().map(String::from), context.group.to_string())
+        };
+        assert_eq!(at(""), (Some(".".into()), String::new()));
+        assert_eq!(at("pkg/util"), (Some("util".into()), String::new()));
+        assert_eq!(at("pkg/util/vendor/v"), (Some("util".into()), String::new()));
+        assert_eq!(at("staging/api/core"), (Some("core".into()), String::new()));
+        assert_eq!(at("staging/lone"), (Some("lone".into()), "staging/lone".into()));
     }
 
     #[test]

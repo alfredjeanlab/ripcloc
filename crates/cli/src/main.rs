@@ -214,21 +214,35 @@ impl Row {
 fn main() -> anyhow::Result<()> {
     let args = Args::parse();
 
-    // A path inside another is already counted with it.
+    // Paths are compared in their canonical form, so that a path inside another, or one path
+    // given twice in different forms, is counted once. A directory is walked as it is given,
+    // since a short relative path is faster to open than a long absolute one, but a file is
+    // counted at its canonical path, which always has a parent directory to resolve.
     let mut paths = Vec::new();
     for path in &args.paths {
-        let path =
+        let canonical =
             std::fs::canonicalize(path).map_err(|e| anyhow::anyhow!("{}: {e}", path.display()))?;
-        paths.push(path);
+        paths.push((canonical, path));
     }
-    paths.sort();
-    paths.dedup();
+    paths.sort_by(|(a, _), (b, _)| a.cmp(b));
+    paths.dedup_by(|(a, _), (b, _)| a == b);
+    let paths: Vec<_> = paths
+        .iter()
+        .filter(|(p, _)| !paths.iter().any(|(q, _)| q != p && p.starts_with(q)))
+        .collect();
+    let types: Vec<_> =
+        paths.iter().map(|(p, _)| std::fs::metadata(p).map(|m| m.file_type())).collect();
     let paths: Vec<PathBuf> = paths
         .iter()
-        .filter(|p| !paths.iter().any(|q| q != *p && p.starts_with(q)))
-        .cloned()
+        .zip(&types)
+        .map(|((canonical, given), t)| {
+            if t.as_ref().is_ok_and(|t| t.is_dir()) {
+                given.to_path_buf()
+            } else {
+                canonical.clone()
+            }
+        })
         .collect();
-    let types: Vec<_> = paths.iter().map(|p| std::fs::metadata(p).map(|m| m.file_type())).collect();
     let roots = paths.iter().zip(&types).map(|(p, t)| {
         if t.as_ref().is_ok_and(|t| t.is_dir()) {
             p.clone()
@@ -478,15 +492,19 @@ fn count_file(
     buffer: &mut Vec<u8>,
 ) {
     let mut key = cloc::file_key(path);
-    if key.is_empty() {
-        let Some(shebang) = shebang_key(path) else { return };
-        key = shebang.to_string();
-    }
-    if !cloc::is_counted(&key) {
+    let script = key.is_empty();
+    if script && is_never_script(path) || !script && !cloc::is_counted(&key) {
         return;
     }
     // Skip an unreadable file quietly, since warnings would bury the report.
-    let Some(content) = read(path, max_bytes, buffer) else { return };
+    let Some(content) = read(path, max_bytes, script, buffer) else { return };
+    if script {
+        let start = content.get(..SHEBANG_PREFIX).unwrap_or(content);
+        let Some(shebang) = cloc::shebang_key(start).filter(|k| cloc::is_counted(k)) else {
+            return;
+        };
+        key = shebang.to_string();
+    }
     let utf8;
     let content = match decode_utf16(content) {
         Some(text) => {
@@ -509,25 +527,19 @@ fn count_file(
             || Classifier::of(context.language).is_test(from(&context.root))
             || Classifier::of(context.language).is_test(from(&context.project))
     };
-    let lines = cloc::count_lines(content, &key);
-
     // A file is counted once, in the row that its path decides. Only its lines are divided: the
     // lines of a Rust source file's inline test modules count as tests.
     let kind = |is_test: bool| if is_test { Kind::Test } else { Kind::Source };
+    let lines = || cloc::count_lines(content, &key);
     let parts = if !cloc::is_split(&key) {
-        vec![(Kind::Other, 1, lines)]
+        vec![(Kind::Other, 1, lines())]
     } else if !attribute {
-        vec![(Kind::Code, 1, lines)]
+        vec![(Kind::Code, 1, lines())]
     } else if key == "rs" && !is_test() {
-        let mut test = LineCounts::default();
-        for span in cfg_test::test_spans(content) {
-            if let Some(module) = content.get(span) {
-                test.add(cloc::count_lines(module, &key));
-            }
-        }
+        let (lines, test) = cfg_test::count(content);
         vec![(Kind::Source, 1, lines.without(test)), (Kind::Test, 0, test)]
     } else {
-        vec![(kind(is_test()), 1, lines)]
+        vec![(kind(is_test()), 1, lines())]
     };
 
     let language_name = cloc::language_name(&key);
@@ -547,9 +559,16 @@ fn count_file(
 /// The content of the regular file at `path`, if it is at most `max_bytes`.
 ///
 /// The size comes from the open file, so a file is stat'ed once, and the content is read up to
-/// that size, so a file that grows while it is read is cut at the size it had when opened.
-fn read<'a>(path: &Path, max_bytes: u64, buffer: &'a mut Vec<u8>) -> Option<&'a [u8]> {
-    let file = File::open(path).ok()?;
+/// that size, so a file that grows while it is read is cut at the size it had when opened. With
+/// `script`, the rest of the file is read only when its first [`SHEBANG_PREFIX`] bytes start with
+/// `#!`, since most files without an extension are not scripts.
+fn read<'a>(
+    path: &Path,
+    max_bytes: u64,
+    script: bool,
+    buffer: &'a mut Vec<u8>,
+) -> Option<&'a [u8]> {
+    let mut file = File::open(path).ok()?;
     let metadata = file.metadata().ok()?;
     let len = metadata.len();
     if !metadata.is_file() || len > max_bytes {
@@ -560,21 +579,47 @@ fn read<'a>(path: &Path, max_bytes: u64, buffer: &'a mut Vec<u8>) -> Option<&'a 
         *buffer = Vec::new();
     }
     buffer.clear();
-    buffer.reserve_exact(usize::try_from(len).ok()?);
     // Reading through `take` stops at `len` without another read call to find the end.
-    file.take(len).read_to_end(buffer).ok()?;
+    if script {
+        (&mut file).take(len.min(SHEBANG_PREFIX as u64)).read_to_end(buffer).ok()?;
+        if !buffer.starts_with(b"#!") {
+            return None;
+        }
+    }
+    let rest = len - buffer.len() as u64;
+    buffer.reserve_exact(usize::try_from(rest).ok()?);
+    file.take(rest).read_to_end(buffer).ok()?;
     Some(buffer)
 }
 
-/// The key of the file at `path` from its `#!` line, if it has one that names a known interpreter.
+/// Whether the file at `path`, which has no extension, is named like a file that is never a
+/// script, such as `LICENSE`, so that it is not opened to look for a `#!` line.
 ///
-/// Only the start of the file is read, since most files without an extension are not scripts.
-fn shebang_key(path: &Path) -> Option<&'static str> {
-    let mut start = [0; SHEBANG_PREFIX];
-    let file = File::open(path).ok()?;
-    let len = file.take(SHEBANG_PREFIX as u64).read(&mut start).ok()?;
-    cloc::shebang_key(start.get(..len)?)
+/// Names match in any case, and an upper case name also matches with a suffix after a hyphen,
+/// such as `LICENSE-MIT`.
+fn is_never_script(path: &Path) -> bool {
+    let Some(name) = path.file_name().and_then(|n| n.to_str()) else { return false };
+    let stem = name.split_once('-').map_or("", |(stem, _)| stem);
+    NEVER_SCRIPTS.iter().any(|known| name.eq_ignore_ascii_case(known) || stem == *known)
 }
+
+/// The upper case names of files without an extension that are never scripts.
+const NEVER_SCRIPTS: &[&str] = &[
+    "AUTHORS",
+    "CHANGELOG",
+    "CHANGES",
+    "CODEOWNERS",
+    "CONTRIBUTORS",
+    "COPYING",
+    "LICENCE",
+    "LICENSE",
+    "NOTICE",
+    "OWNERS",
+    "OWNERS_ALIASES",
+    "PATENTS",
+    "README",
+    "VERSION",
+];
 
 /// How many bytes at the start of a file without an extension are read for a `#!` line.
 const SHEBANG_PREFIX: usize = 128;

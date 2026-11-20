@@ -5,7 +5,7 @@
 //!
 //! Comments are found line by line with simple heuristics rather than parsing, as `cloc` does.
 
-use std::borrow::Cow;
+use std::cell::Cell;
 
 /// Blank, comment and code line counts.
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
@@ -125,16 +125,27 @@ pub fn count_lines(content: &(impl AsRef<[u8]> + ?Sized), ext: &str) -> LineCoun
     if matches!(ext, "html" | "htm" | "vue" | "svelte") {
         return count_markup(content, ext);
     }
-    count_in(content, ext)
+    count_in(content, ext, None)
 }
 
 /// Count the lines of `content`, which has no byte order mark, in the language of `ext` alone.
-fn count_in(content: &[u8], ext: &str) -> LineCounts {
+///
+/// Onto `code_starts` go the offsets of lines that start in code outside every comment and string,
+/// in order, each with the counts of the lines before it. Not every such line is pushed, but every
+/// one that starts with `#` is.
+pub fn count_in(content: &[u8], ext: &str, code_starts: Option<&mut CodeStarts>) -> LineCounts {
     let syntax = Syntax::new(ext);
     let opens_after_code =
         if syntax.c_like { syntax.opens_after_code(content) } else { Vec::new() };
-    syntax.count(content, &opens_after_code)
+    // The loop that does not push the lines is a copy of its own, which pays nothing for them.
+    match code_starts {
+        Some(code_starts) => syntax.count::<true>(content, &opens_after_code, code_starts),
+        None => syntax.count::<false>(content, &opens_after_code, &mut Vec::new()),
+    }
 }
+
+/// The lines that [`count_in`] pushes onto its `code_starts`.
+type CodeStarts = Vec<(usize, LineCounts)>;
 
 /// Count the lines of `content`, markup in the language of `ext` that has `<script>` and `<style>`
 /// elements, whose bodies are counted in their own languages.
@@ -156,13 +167,13 @@ fn count_markup(content: &[u8], ext: &str) -> LineCounts {
         let mut tags = line;
         if let Some((close, language, body)) = element {
             let Some(end) = find_ignore_case(line, close) else { continue };
-            counts.add(count_in(content.get(body..at).unwrap_or_default(), language));
+            counts.add(count_in(content.get(body..at).unwrap_or_default(), language, None));
             (markup, element) = (at, None);
             tags = line.get(end + close.len()..).unwrap_or_default();
         }
         if let Some((close, language)) = element_opening(tags, &mut in_comment) {
             let body = (at + line.len() + 1).min(content.len());
-            counts.add(count_in(content.get(markup..body).unwrap_or_default(), ext));
+            counts.add(count_in(content.get(markup..body).unwrap_or_default(), ext, None));
             element = Some((close, language, body));
         }
     }
@@ -170,7 +181,7 @@ fn count_markup(content: &[u8], ext: &str) -> LineCounts {
         Some((_, language, body)) => (body, language),
         None => (markup, ext),
     };
-    counts.add(count_in(content.get(rest..).unwrap_or_default(), language));
+    counts.add(count_in(content.get(rest..).unwrap_or_default(), language, None));
     counts
 }
 
@@ -291,24 +302,66 @@ fn find_ignore_case(text: &[u8], needle: &[u8]) -> Option<usize> {
         .find(|&at| starts_with_ignore_case(text.get(at..).unwrap_or_default(), needle))
 }
 
-/// The lines of `content` in the language of `ext`, each with its code, which is the line without
-/// its comments and without its string and character literals.
-pub fn code_lines<'a>(
-    content: &'a [u8],
-    ext: &str,
-) -> impl Iterator<Item = (&'a [u8], Cow<'a, [u8]>)> {
-    let (syntax, mut state) = (Syntax::new(ext), State::default());
-    lines(content).map(move |line| {
-        let mut code = Cow::Borrowed(&[][..]);
-        state = syntax.scan(line, state, &mut |run| {
-            if code.is_empty() {
-                code = Cow::Borrowed(run);
-            } else if !run.is_empty() {
-                code.to_mut().extend_from_slice(run);
-            }
-        });
-        (line, code)
-    })
+/// The lines of a text in one language, each with its code, which is the line without its comments
+/// and without its string and character literals.
+///
+/// The code of a line is found only when [`CodeLines::code`] asks for it, because a line whose
+/// code is not needed is only scanned for the state after it, which costs less.
+pub struct CodeLines<'a> {
+    lines: Lines<'a>,
+    syntax: Syntax,
+    state: State,
+    /// The last line returned, if it has not been scanned yet.
+    unscanned: Option<&'a [u8]>,
+    /// The code of the last line when it is a single run of the line, which needs no copy.
+    run: &'a [u8],
+    /// The code of the last line when it joins more than one run, and is empty otherwise.
+    joined: Vec<u8>,
+}
+
+impl<'a> CodeLines<'a> {
+    /// The lines of `content` in the language of `ext`.
+    pub fn new(content: &'a [u8], ext: &str) -> Self {
+        let (syntax, state) = (Syntax::new(ext), State::default());
+        Self { lines: lines(content), syntax, state, unscanned: None, run: &[], joined: Vec::new() }
+    }
+
+    /// Go on with the lines of `rest`, a later part of the text that starts in code outside every
+    /// comment and string.
+    pub fn restart(&mut self, rest: &'a [u8]) {
+        (self.lines, self.state, self.unscanned) = (lines(rest), State::default(), None);
+    }
+
+    /// The next line, split as [`lines`] splits them, or `None` after the last.
+    pub fn next_line(&mut self) -> Option<&'a [u8]> {
+        if let Some(line) = self.unscanned.take()
+            && self.syntax.may_leave(&self.state, line)
+        {
+            self.state = self.syntax.scan(line, self.state, &mut |_| {});
+        }
+        self.unscanned = self.lines.next();
+        self.unscanned
+    }
+
+    /// The code of the line that [`CodeLines::next_line`] returned last.
+    pub fn code(&mut self) -> &[u8] {
+        if let Some(line) = self.unscanned.take() {
+            let (run, joined) = (&mut self.run, &mut self.joined);
+            *run = &[];
+            joined.clear();
+            self.state = self.syntax.scan(line, self.state, &mut |code| {
+                if run.is_empty() {
+                    *run = code;
+                } else if !code.is_empty() {
+                    if joined.is_empty() {
+                        joined.extend_from_slice(run);
+                    }
+                    joined.extend_from_slice(code);
+                }
+            });
+        }
+        if self.joined.is_empty() { self.run } else { &self.joined }
+    }
 }
 
 /// A kind of string literal, which opens at the quotes `open` and closes at the same quotes.
@@ -450,7 +503,7 @@ impl Str {
             // escape.
             i = match tail {
                 [quote, again, ..] if *quote == escape && again == quote => at + 2,
-                _ if tail.starts_with(close) => return Some(at + close.len()),
+                _ if starts_with(tail, close) => return Some(at + close.len()),
                 [byte, ..] if *byte == escape => at + 2,
                 _ => at + 1,
             };
@@ -556,8 +609,14 @@ struct Syntax {
     starts: [bool; 256],
     /// The bytes in `starts`, and those that the scanner stops at for strings.
     special: [bool; 256],
+    /// The bytes in `special`, in order. When there are at most three, they are found with
+    /// `memchr`, which is faster than looking up every byte in `special`.
+    special_bytes: Vec<u8>,
     /// The quotes that can open a string that spans lines.
     spanning: Vec<u8>,
+    /// The bytes in `spanning`, and the first bytes of the block comment delimiters, without
+    /// which a line that starts in code ends in code.
+    openers: Vec<u8>,
     /// Whether a block comment can open after code, as C's `/*` and OCaml's `(*` do. An HTML
     /// comment cannot, since a Markdown code block may show one opening.
     c_like: bool,
@@ -576,23 +635,31 @@ impl Syntax {
         let mut starts = [false; 256];
         let delimiters =
             style.block.iter().map(|&(open, _)| open).chain(style.line.iter().copied());
-        for delimiter in delimiters {
-            if let Some(&first) = delimiter.as_bytes().first() {
-                mark(&mut starts, first);
-            }
+        let mut special_bytes: Vec<u8> =
+            delimiters.filter_map(|delimiter| delimiter.as_bytes().first().copied()).collect();
+        for &byte in &special_bytes {
+            mark(&mut starts, byte);
         }
-        let mut special = starts;
         let quotes = literals.iter().filter_map(|l| l.open.first().copied());
         let braces = if javascript { b"{}".as_slice() } else { b"" };
         let char_quote = if literals.is_empty() { b"".as_slice() } else { b"'" };
-        for byte in quotes.chain(braces.iter().copied()).chain(char_quote.iter().copied()) {
+        special_bytes
+            .extend(quotes.chain(braces.iter().copied()).chain(char_quote.iter().copied()));
+        special_bytes.sort_unstable();
+        special_bytes.dedup();
+        let mut special = [false; 256];
+        for &byte in &special_bytes {
             mark(&mut special, byte);
         }
-        let spanning = b"\"'`"
+        let spanning: Vec<u8> = b"\"'`"
             .iter()
             .copied()
             .filter(|&q| literals.iter().any(|l| l.spans && l.open.first() == Some(&q)))
             .collect();
+        let block_starts = style.block.iter().filter_map(|&(open, _)| open.as_bytes().first());
+        let mut openers: Vec<u8> = spanning.iter().chain(block_starts).copied().collect();
+        openers.sort_unstable();
+        openers.dedup();
         let nests = matches!(
             ext,
             "rs" | "swift"
@@ -607,7 +674,18 @@ impl Syntax {
                 | "lean"
                 | "coq"
         );
-        Self { style, literals, nests, javascript, starts, special, spanning, c_like }
+        Self {
+            style,
+            literals,
+            nests,
+            javascript,
+            starts,
+            special,
+            special_bytes,
+            spanning,
+            openers,
+            c_like,
+        }
     }
 
     /// Whether a comment delimiter of the language starts with `byte`.
@@ -621,42 +699,90 @@ impl Syntax {
         self.special.get(usize::from(byte)).copied().unwrap_or(true)
     }
 
+    /// Whether [`Syntax::scan`] can end in another state than `state` after `text`. It cannot when
+    /// `text` starts in code outside every substitution and has none of the `openers`.
+    fn may_leave(&self, state: &State, text: &[u8]) -> bool {
+        if state.mode != Mode::Code || state.substitutions != 0 {
+            return true;
+        }
+        match *self.openers {
+            [] => false,
+            [a] => memchr::memchr(a, text).is_some(),
+            [a, b] => memchr::memchr2(a, b, text).is_some(),
+            [a, b, c] => memchr::memchr3(a, b, c, text).is_some(),
+            _ => true,
+        }
+    }
+
+    /// The offset of the first byte in `text` that the scanner stops at.
+    fn find_special(&self, text: &[u8]) -> Option<usize> {
+        match *self.special_bytes {
+            [] => None,
+            [a] => memchr::memchr(a, text),
+            [a, b] => memchr::memchr2(a, b, text),
+            [a, b, c] => memchr::memchr3(a, b, c, text),
+            _ => text.iter().position(|&b| self.is_special(b)),
+        }
+    }
+
     /// Count the lines of `content`, where a block comment can open after code only on the lines
     /// that start at the sorted offsets `opens_after_code`.
-    fn count(&self, content: &[u8], opens_after_code: &[usize]) -> LineCounts {
+    fn count<const PUSH: bool>(
+        &self,
+        content: &[u8],
+        opens_after_code: &[usize],
+        code_starts: &mut CodeStarts,
+    ) -> LineCounts {
         let style = &self.style;
         let mut counts = LineCounts::default();
         let mut state = State::default();
-        let offset = |line: &[u8]| line.as_ptr().addr() - content.as_ptr().addr();
         let mut offsets = opens_after_code.iter().copied().peekable();
-        let mut may_open = |line: &[u8]| {
-            let start = offset(line);
-            while offsets.next_if(|&offset| offset < start).is_some() {}
-            offsets.peek() == Some(&start)
-        };
         // The offset of the first byte at or after the cursor that can open a string that spans
         // lines. Finding it once for many lines keeps the cost of strings to the lines with one.
         let spanning = self.spanning.as_slice();
         let mut next_opener = find_any(content, 0, spanning);
-        let mut has_opener = |line: &[u8]| {
-            let start = offset(line);
+        // The lesser of `next_opener` and the next offset in `opens_after_code`, so that a line
+        // that ends before it is told apart from the lines to scan by one comparison.
+        let next_scan = Cell::new(next_opener.min(offsets.peek().copied().unwrap_or(usize::MAX)));
+        // Whether the rest of `line` from a point outside every comment and string, where `state`
+        // holds any substitutions that the point is inside, must be scanned for the state after
+        // it.
+        let mut needs_scan = |line: &[u8], state: &State| {
+            let start = line.as_ptr().addr() - content.as_ptr().addr();
+            let end = start + line.len();
+            if state.substitutions == 0 && end < next_scan.get() {
+                return false;
+            }
             if next_opener < start {
                 next_opener = find_any(content, start, spanning);
             }
-            next_opener < start + line.len()
-        };
-        // The state after `text`, the rest of `line` from a point outside every comment and
-        // string, where `state` holds any substitutions that the point is inside.
-        let mut after_code = |line: &[u8], text: &[u8], state: State| {
-            let may_open = !opens_after_code.is_empty() && may_open(line);
-            if state.substitutions != 0 || has_opener(line) || may_open {
-                self.scan(text, state, &mut |_| {})
-            } else {
-                state
-            }
+            while offsets.next_if(|&offset| offset < start).is_some() {}
+            let next_open = offsets.peek().copied();
+            next_scan.set(next_opener.min(next_open.unwrap_or(usize::MAX)));
+            state.substitutions != 0 || next_opener < end || next_open == Some(start)
         };
 
-        for line in lines(content) {
+        let mut lines = lines(content);
+        while let Some(mut line) = lines.next() {
+            // A line that ends at or after `next_scan` is told apart here, so that it does not cost
+            // a call to `count_plain` that returns at once.
+            let end = line.as_ptr().addr() - content.as_ptr().addr() + line.len();
+            if end < next_scan.get() && state == State::default() {
+                let until = next_scan.get();
+                let next = self.count_plain::<PUSH>(
+                    content,
+                    line,
+                    &mut lines,
+                    until,
+                    &mut counts,
+                    code_starts,
+                );
+                let Some(next) = next else { break };
+                line = next;
+            }
+            if PUSH && state == State::default() {
+                code_starts.push((line.as_ptr().addr() - content.as_ptr().addr(), counts));
+            }
             let trimmed = trim_start(line);
             let Some(&first) = trimmed.first() else {
                 counts.blank += 1;
@@ -670,7 +796,9 @@ impl Syntax {
                 }
                 Mode::Code if !self.starts_with(first) => {
                     counts.code += 1;
-                    state = after_code(line, trimmed, state);
+                    if needs_scan(line, &state) {
+                        state = self.scan(trimmed, state, &mut |_| {});
+                    }
                     continue;
                 }
                 Mode::Code | Mode::Block(_) => {}
@@ -691,7 +819,9 @@ impl Syntax {
                 continue;
             } else {
                 counts.code += 1;
-                state = after_code(line, trimmed, state);
+                if needs_scan(line, &state) {
+                    state = self.scan(trimmed, state, &mut |_| {});
+                }
                 continue;
             };
             match self.comment_end(rest, &mut comment).and_then(|end| rest.get(end..)) {
@@ -705,12 +835,74 @@ impl Syntax {
                         counts.comment += 1;
                     } else {
                         counts.code += 1;
-                        state = after_code(line, after, state);
+                        if needs_scan(line, &state) {
+                            state = self.scan(after, state, &mut |_| {});
+                        }
                     }
                 }
             }
         }
         counts
+    }
+
+    /// Count the lines from `line` on, which `lines` follow in `content`, while they start in code
+    /// outside every string, end before the offset `until` and open no block comment. Return the
+    /// first line that does not, or `None` after the last line.
+    ///
+    /// Such a line is blank, a line comment or code by its first bytes alone, and most lines are
+    /// such lines. The loop keeps its cursor and counts in registers only when it is a function of
+    /// its own, since the state of the loop in [`Syntax::count`] crowds them out.
+    #[inline(never)]
+    fn count_plain<'a, const PUSH: bool>(
+        &self,
+        content: &'a [u8],
+        mut line: &'a [u8],
+        lines: &mut Lines<'a>,
+        until: usize,
+        counts: &mut LineCounts,
+        code_starts: &mut CodeStarts,
+    ) -> Option<&'a [u8]> {
+        let (mut rest, mut local) = (lines.clone(), *counts);
+        let next = loop {
+            if line.as_ptr().addr() - content.as_ptr().addr() + line.len() >= until {
+                break Some(line);
+            }
+            let trimmed = trim_start(line);
+            match trimmed.first() {
+                None => local.blank += 1,
+                Some(&first) if !self.starts_with(first) => {
+                    if PUSH && first == b'#' {
+                        code_starts.push((line.as_ptr().addr() - content.as_ptr().addr(), local));
+                    }
+                    local.code += 1;
+                }
+                Some(_) => match self.line_comment(trimmed) {
+                    None => break Some(line),
+                    Some(true) => local.comment += 1,
+                    Some(false) => local.code += 1,
+                },
+            }
+            let Some(next) = rest.next() else { break None };
+            line = next;
+        };
+        (*lines, *counts) = (rest, local);
+        next
+    }
+
+    /// Whether `text`, a line without leading whitespace that starts in code outside every string,
+    /// is a line comment rather than code, or `None` if it opens a block comment.
+    ///
+    /// The loop in [`Syntax::count_plain`] keeps more of its state in registers when this is not
+    /// inlined into it.
+    #[inline(never)]
+    fn line_comment(&self, text: &[u8]) -> Option<bool> {
+        // Delimiters such as `REM ` end in a space, so they are matched against the line without
+        // its trailing whitespace.
+        let text = trim_end(text);
+        if self.style.block.iter().any(|&(open, _)| text.starts_with(open.as_bytes())) {
+            return None;
+        }
+        Some(self.style.line.iter().any(|p| text.starts_with(p.as_bytes())))
     }
 
     /// The offset in `text` after the end of `comment`, or `None` if it does not end in `text`, in
@@ -771,6 +963,10 @@ impl Syntax {
     /// Comments and strings are found in the order in which they open, so that a quote inside a
     /// comment, as in `// don't`, does not open a string, and a comment delimiter inside a string
     /// does not open a comment. A string that does not span lines ends with the line.
+    ///
+    /// Most lines of code are not scanned, and the loop in [`Syntax::count`] is faster when this
+    /// is not inlined into it.
+    #[inline(never)]
     fn scan<'a>(&self, text: &'a [u8], mut state: State, code: &mut impl FnMut(&'a [u8])) -> State {
         let mut i = 0;
         // The start of the run of code that `code` has not yet been called with.
@@ -806,9 +1002,7 @@ impl Syntax {
                     }
                 }
                 Mode::Code => {
-                    let Some(at) =
-                        text.get(i..).and_then(|t| t.iter().position(|&b| self.is_special(b)))
-                    else {
+                    let Some(at) = text.get(i..).and_then(|t| self.find_special(t)) else {
                         code(text.get(start..).unwrap_or_default());
                         return state;
                     };
@@ -818,14 +1012,14 @@ impl Syntax {
                     if self.starts_with(byte) {
                         let block = self.style.block.iter().find_map(|&(open, close)| {
                             let (open, close) = (open.as_bytes(), close.as_bytes());
-                            rest.starts_with(open).then_some(Comment { open, close, depth: 0 })
+                            starts_with(rest, open).then_some(Comment { open, close, depth: 0 })
                         });
                         if let Some(comment) = block {
                             code(run);
                             (i, state.mode) = (i + comment.open.len(), Mode::Block(comment));
                             continue;
                         }
-                        if self.style.line.iter().any(|p| rest.starts_with(p.as_bytes())) {
+                        if self.style.line.iter().any(|p| starts_with(rest, p.as_bytes())) {
                             code(run);
                             return state;
                         }
@@ -879,7 +1073,7 @@ impl Syntax {
             start.is_some_and(|start| !ident_before(start, start.len()))
         };
         self.literals.iter().find_map(|literal| {
-            let open = rest.starts_with(literal.open).then_some(literal.open)?;
+            let open = starts_with(rest, literal.open).then_some(literal.open)?;
             let (quotes, hashes) = match literal.special {
                 Plain => (open, 0),
                 After(prefix) if head.ends_with(prefix) => (open, 0),
@@ -987,7 +1181,7 @@ fn find(text: &[u8], delimiter: &[u8]) -> Option<usize> {
     let mut from = 0;
     while let Some(i) = text.get(from..).and_then(|tail| memchr::memchr(first, tail)) {
         let at = from + i + 1;
-        if text.get(at..).is_some_and(|tail| tail.starts_with(rest)) {
+        if text.get(at..).is_some_and(|tail| starts_with(tail, rest)) {
             return Some(at - 1);
         }
         from = at;
@@ -995,17 +1189,42 @@ fn find(text: &[u8], delimiter: &[u8]) -> Option<usize> {
     None
 }
 
+/// Whether `text` starts with `prefix`, a delimiter or quote of a few bytes, which are compared
+/// one by one, since that is faster than a call to `memcmp` for so few.
+fn starts_with(text: &[u8], prefix: &[u8]) -> bool {
+    text.len() >= prefix.len() && text.iter().zip(prefix).all(|(a, b)| a == b)
+}
+
 /// The lines of `content`, split as [`str::lines`] splits them, except that a line keeps a
 /// trailing `\r`, which [`trim`] removes.
-pub fn lines(content: &[u8]) -> impl Iterator<Item = &[u8]> {
-    let mut start = 0;
-    let ends = memchr::memchr_iter(b'\n', content).chain(std::iter::once(content.len()));
-    ends.filter_map(move |end| {
-        let line = content.get(start..end)?;
-        start = end + 1;
+pub fn lines(content: &[u8]) -> Lines<'_> {
+    Lines { rest: Some(content) }
+}
+
+/// The iterator that [`lines`] returns.
+#[derive(Clone)]
+pub struct Lines<'a> {
+    /// The text after the last line returned, or `None` after the last line.
+    rest: Option<&'a [u8]>,
+}
+
+impl<'a> Iterator for Lines<'a> {
+    type Item = &'a [u8];
+
+    // Counting spends much of its time here, and the loops that call this are fastest with it
+    // inlined.
+    #[inline(always)]
+    fn next(&mut self) -> Option<&'a [u8]> {
         // The text after a final newline is not a line.
-        (end < content.len() || !line.is_empty()).then_some(line)
-    })
+        let rest = self.rest.filter(|rest| !rest.is_empty())?;
+        let (line, rest) = match memchr::memchr(b'\n', rest).and_then(|n| rest.split_at_checked(n))
+        {
+            Some((line, newline)) => (line, newline.get(1..)),
+            None => (rest, None),
+        };
+        self.rest = rest;
+        Some(line)
+    }
 }
 
 /// `text` without leading and trailing whitespace, as [`str::trim`] removes it.
@@ -1021,7 +1240,7 @@ pub fn trim_start(mut text: &[u8]) -> &[u8] {
     while let Some(&first) = text.first() {
         let len = match first {
             b' ' | b'\t' | b'\n' | b'\x0B' | b'\x0C' | b'\r' => 1,
-            0x80.. => match text.get(..utf8_width(first)).and_then(whitespace_char) {
+            0x80.. => match leading_whitespace_char(text) {
                 Some(len) => len,
                 None => break,
             },
@@ -1068,6 +1287,16 @@ pub fn utf8_width(first: u8) -> usize {
         0xF0..=0xF7 => 4,
         _ => 1,
     }
+}
+
+/// The length of the whitespace character that starts `text`, if it starts with one.
+///
+/// A line rarely starts with a byte outside ASCII, and the loops that trim lines keep fewer
+/// registers busy when this is not inlined into them.
+#[cold]
+#[inline(never)]
+fn leading_whitespace_char(text: &[u8]) -> Option<usize> {
+    text.get(..utf8_width(*text.first()?)).and_then(whitespace_char)
 }
 
 /// The length of `bytes` if they are exactly one whitespace character.
@@ -1861,6 +2090,31 @@ mod tests {
         // Strings in C do not span lines, and quotes are not scanned in shell scripts.
         assert_eq!(counts("char *s = \"\\\n// c\n", "c"), (0, 1, 1));
         assert_eq!(counts("echo \"\n# c\n\"\n", "sh"), (0, 1, 2));
+    }
+
+    #[test]
+    fn block_comment_opens_after_plain_lines() {
+        let content =
+            "int a;\n// c\n\n  /* open\n   inside */\nint b; /* x */\n/* one */\nint c;\n";
+        assert_eq!(counts(content, "c"), (1, 4, 3));
+        // The block delimiter `--[[` starts with the line delimiter `--`.
+        let content = "local a = 1\n-- c\n--[[ open\ninside ]]\nlocal b = 2\n";
+        assert_eq!(counts(content, "lua"), (0, 3, 2));
+    }
+
+    #[test]
+    fn plain_lines_with_crlf_endings() {
+        let content = "int a;\r\n// c\r\n\r\n \t\r\n/* open\r\n */\r\nint b;\r\n";
+        assert_eq!(counts(content, "c"), (2, 3, 2));
+        // `REM ` ends in a space, so the line is matched without its trailing whitespace.
+        let content = "x = 1\r\nREM \r\nREM c\r\n";
+        assert_eq!(counts(content, "bat"), (0, 1, 2));
+    }
+
+    #[test]
+    fn plain_lines_start_after_whitespace_outside_ascii() {
+        let content = "\u{3000}// c\n\u{a0}int a;\n\u{3000}\n\u{e9}t\u{e9};\n";
+        assert_eq!(counts(content, "c"), (1, 1, 2));
     }
 
     #[test]

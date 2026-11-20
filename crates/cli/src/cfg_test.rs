@@ -3,164 +3,221 @@
 
 //! #[cfg(test)] block detection.
 //!
-//! Parses Rust source files to identify line ranges inside #[cfg(test)] blocks.
+//! Finds the inline `#[cfg(test)] mod` blocks of a Rust source file, lexing only the lines from
+//! each attribute that may be `#[cfg(test)]` to the end of its item.
 
 use std::ops::Range;
 
-use memchr::{memchr_iter, memmem};
+use memchr::{memchr, memchr_iter, memchr2, memmem};
 
-use crate::cloc::{code_lines, trim};
-
-/// Result of parsing a Rust file for #[cfg(test)] blocks.
-#[derive(Debug, Default)]
-pub struct CfgTestInfo {
-    /// Line ranges (0-indexed) of `#[cfg(test)] mod` blocks, from the attribute through the
-    /// closing brace.
-    pub test_ranges: Vec<Range<usize>>,
-    /// The number of non-blank lines in `test_ranges`.
-    pub test_lines: usize,
-}
+use crate::cloc::{self, CodeLines, LineCounts, trim};
 
 /// State for tracking multi-line attribute parsing.
 struct MultiLineAttr {
     /// Accumulated content of the attribute.
     content: Vec<u8>,
-    /// Line where the attribute started.
-    start_line: usize,
-    /// The number of non-blank lines before `start_line`.
-    nonblank_before: usize,
+    /// The offset of the line where the attribute started.
+    start: usize,
 }
 
-impl CfgTestInfo {
-    /// Parse a Rust source file to find #[cfg(test)] block ranges.
-    ///
-    /// Uses a brace-counting approach with proper lexer state tracking:
-    /// 1. Scan for #[cfg(test)] attribute (handles multi-line)
-    /// 2. Count { and } to track block depth (skipping string/char literals)
-    /// 3. Block ends when brace depth returns to 0
-    ///
-    /// External module declarations (`mod tests;`) are NOT counted as inline tests.
-    pub fn parse(content: &(impl AsRef<[u8]> + ?Sized)) -> Self {
-        let mut info = Self::default();
-        let mut in_cfg_test = false;
-        let mut brace_depth: i32 = 0;
-        let mut block_start = 0;
-        let mut pending_attr: Option<MultiLineAttr> = None;
-        // Track if we've seen the first opening brace after #[cfg(test)]
-        let mut waiting_for_block_start = false;
-        // Whether the current #[cfg(test)] item is a module
-        let mut is_mod = false;
-        // The number of non-blank lines so far, and before `block_start`.
-        let mut nonblank = 0;
-        let mut nonblank_before = 0;
+/// The counts of the lines of a Rust source file, and the counts of the lines of its inline test
+/// modules, which are a part of the first. Each module is counted as a text of its own.
+pub fn count(content: &[u8]) -> (LineCounts, LineCounts) {
+    let content = content.strip_prefix(b"\xEF\xBB\xBF").unwrap_or(content);
+    let mut code_starts = Vec::new();
+    let counts = cloc::count_in(content, "rs", Some(&mut code_starts));
+    // The counts of the lines before `offset`, when a line in `code_starts` or the end is there.
+    let before = |offset: usize| match code_starts.binary_search_by_key(&offset, |&(at, _)| at) {
+        Ok(i) => code_starts.get(i).map(|&(_, counts)| counts),
+        Err(_) => (offset == content.len()).then_some(counts),
+    };
+    let mut test = LineCounts::default();
+    for span in test_spans(content, &code_starts) {
+        // A module that starts in code outside every comment and string has the same counts in
+        // the file as alone, which are those before the line after it less those before it.
+        test.add(match (before(span.start), before(span.end)) {
+            (Some(first), Some(after)) => after.without(first),
+            _ => cloc::count_lines(content.get(span).unwrap_or_default(), "rs"),
+        });
+    }
+    (counts, test)
+}
 
-        for (line_idx, (line, code)) in code_lines(content.as_ref(), "rs").enumerate() {
-            if trim(line).is_empty() {
-                continue;
+/// The byte ranges of the inline test modules of `content`, a Rust source file, each from the
+/// start of its first line to the start of the line after its last.
+///
+/// A test module is a `mod` item after a `#[cfg(...)]` attribute that names `test`, which may span
+/// lines, and it ends at the brace that brings the depth of the braces outside comments and
+/// strings back to 0. A module declared without a body, as in `mod tests;`, is not one.
+///
+/// Lexing starts afresh at the lines in `code_starts`, which [`cloc::count_in`] pushes, and skips
+/// to the last of them before the next byte that matters. Only the lines from there to that byte
+/// are lexed.
+pub fn test_spans(content: &[u8], code_starts: &[(usize, LineCounts)]) -> Vec<Range<usize>> {
+    let mut spans = Vec::new();
+    let mut in_cfg_test = false;
+    let mut brace_depth: i32 = 0;
+    let mut block_start = 0;
+    let mut pending_attr: Option<MultiLineAttr> = None;
+    // Whether the first opening brace after the attribute is still to come.
+    let mut waiting_for_block_start = false;
+    // Whether the current #[cfg(test)] item is a module
+    let mut is_mod = false;
+    // The offset of the line after the last line lexed, and those of the next `#` that may start
+    // `#[cfg(` and of the next brace once they have been found.
+    let Some(first) = next_cfg(content, 0) else { return spans };
+    let (mut next, mut hash, mut brace) = (0, Some(first), None);
+    let mut starts = code_starts.iter().map(|&(start, _)| start).peekable();
+    let mut lines = CodeLines::new(content, "rs");
+    loop {
+        // Outside an attribute and a test item, only a line with `#[cfg(` in its code matters,
+        // and inside the body of a test item, only a line with a brace. A line that ends before
+        // `target`, the offset of the next such byte, is not split into code.
+        let mut target = 0;
+        if pending_attr.is_none() && !waiting_for_block_start {
+            let found = if in_cfg_test { &mut brace } else { &mut hash };
+            target = match *found {
+                Some(at) if at >= next => at,
+                _ => {
+                    let at = if in_cfg_test {
+                        content
+                            .get(next..)
+                            .and_then(|rest| memchr2(b'{', b'}', rest))
+                            .map(|at| next + at)
+                    } else {
+                        next_cfg(content, next)
+                    };
+                    let Some(at) = at else { break };
+                    *found.insert(at)
+                }
+            };
+            let mut restart = None;
+            while let Some(start) = starts.next_if(|&start| start <= target) {
+                restart = Some(start).filter(|&start| start >= next).or(restart);
             }
-            nonblank += 1;
-
-            let trimmed = trim(&code);
-
-            // If entire line is in a comment or a string, skip it
-            if trimmed.is_empty() {
-                continue;
+            if let Some(start) = restart {
+                lines.restart(content.get(start..).unwrap_or_default());
             }
+        }
+        let Some(line) = lines.next_line() else { break };
+        let line_start = line.as_ptr().addr() - content.as_ptr().addr();
+        next = (line_start + line.len() + 1).min(content.len());
+        if target >= next {
+            continue;
+        }
+        let trimmed = trim(lines.code());
 
-            // Handle multi-line attribute accumulation
-            if let Some(ref mut attr) = pending_attr {
-                attr.content.extend_from_slice(trimmed);
+        // If entire line is in a comment or a string, skip it
+        if trimmed.is_empty() {
+            continue;
+        }
 
-                // Check if the attribute is complete (has closing bracket)
-                if contains(trimmed, b")]")
-                    || (trimmed.contains(&b')') && contains(&attr.content, b")]"))
-                {
-                    // Attribute complete, check if it's cfg(test)
-                    if is_cfg_test_content(&attr.content) {
+        // Handle multi-line attribute accumulation
+        if let Some(ref mut attr) = pending_attr {
+            attr.content.extend_from_slice(trimmed);
+
+            // Check if the attribute is complete (has closing bracket)
+            if contains(trimmed, b")]")
+                || (trimmed.contains(&b')') && contains(&attr.content, b")]"))
+            {
+                // Attribute complete, check if it's cfg(test)
+                if is_cfg_test_content(&attr.content) {
+                    in_cfg_test = true;
+                    waiting_for_block_start = true;
+                    block_start = attr.start;
+                    brace_depth = 0;
+                }
+                pending_attr = None;
+            }
+            continue;
+        }
+
+        // Check for #[cfg(test)] attribute (single-line or start of multi-line)
+        if !in_cfg_test && let Some(attr_state) = detect_cfg_attr_start(trimmed, line_start) {
+            match attr_state {
+                CfgAttrState::Complete(is_test) => {
+                    if is_test {
                         in_cfg_test = true;
                         waiting_for_block_start = true;
-                        block_start = attr.start_line;
-                        nonblank_before = attr.nonblank_before;
+                        block_start = line_start;
                         brace_depth = 0;
                     }
-                    pending_attr = None;
                 }
+                CfgAttrState::Incomplete(attr) => {
+                    pending_attr = Some(attr);
+                }
+            }
+            if pending_attr.is_some() || in_cfg_test {
                 continue;
-            }
-
-            // Check for #[cfg(test)] attribute (single-line or start of multi-line)
-            if !in_cfg_test
-                && let Some(attr_state) = detect_cfg_attr_start(trimmed, line_idx, nonblank - 1)
-            {
-                match attr_state {
-                    CfgAttrState::Complete(is_test) => {
-                        if is_test {
-                            in_cfg_test = true;
-                            waiting_for_block_start = true;
-                            block_start = line_idx;
-                            nonblank_before = nonblank - 1;
-                            brace_depth = 0;
-                        }
-                    }
-                    CfgAttrState::Incomplete(attr) => {
-                        pending_attr = Some(attr);
-                    }
-                }
-                if pending_attr.is_some() || in_cfg_test {
-                    continue;
-                }
-            }
-
-            if in_cfg_test {
-                // Skip additional attributes (like #[path = "..."])
-                if trimmed.starts_with(b"#[") {
-                    continue;
-                }
-
-                let delta = count_braces(trimmed);
-
-                // If we're still waiting for the block to start and we see a line
-                // without an opening brace that ends with ';', it's an external module
-                if waiting_for_block_start {
-                    is_mod = is_mod_item(trimmed);
-
-                    if delta > 0 {
-                        // Found opening brace - this is an inline block
-                        waiting_for_block_start = false;
-                        brace_depth += delta;
-                    } else if trimmed.ends_with(b";") {
-                        // External module declaration (e.g., "mod tests;")
-                        // Not an inline test block
-                        in_cfg_test = false;
-                        waiting_for_block_start = false;
-                        continue;
-                    }
-                    // Otherwise keep waiting (might be blank line or comment)
-                    continue;
-                }
-
-                brace_depth += delta;
-
-                if brace_depth == 0 && delta < 0 {
-                    // Block ended (we saw a closing brace that brought us to 0)
-                    // Only `mod` blocks count as tests. Other items, such as helpers, fixtures
-                    // and macros, are test infrastructure.
-                    if is_mod {
-                        info.test_ranges.push(block_start..line_idx + 1);
-                        info.test_lines += nonblank - nonblank_before;
-                    }
-                    in_cfg_test = false;
-                }
             }
         }
 
-        info
-    }
+        if in_cfg_test {
+            // Skip additional attributes (like #[path = "..."])
+            if trimmed.starts_with(b"#[") {
+                continue;
+            }
 
-    /// Check if a line (0-indexed) is inside a #[cfg(test)] block.
-    #[cfg(test)]
-    pub fn is_test_line(&self, line_idx: usize) -> bool {
-        self.test_ranges.iter().any(|r| r.contains(&line_idx))
+            let delta = count_braces(trimmed);
+
+            // Before its first opening brace, an item that ends with `;` is declared without a
+            // body, as an external module such as `mod tests;` is, and is not an inline test.
+            if waiting_for_block_start {
+                is_mod = is_mod_item(trimmed);
+
+                if delta > 0 {
+                    // Found opening brace - this is an inline block
+                    waiting_for_block_start = false;
+                    brace_depth += delta;
+                } else if trimmed.ends_with(b";") {
+                    // External module declaration (e.g., "mod tests;")
+                    // Not an inline test block
+                    in_cfg_test = false;
+                    waiting_for_block_start = false;
+                    continue;
+                }
+                // Otherwise keep waiting (might be blank line or comment)
+                continue;
+            }
+
+            brace_depth += delta;
+
+            if brace_depth == 0 && delta < 0 {
+                // The item ends at the closing brace that brings the depth back to 0. Only `mod`
+                // blocks count as tests. Other items, such as helpers, fixtures and macros, are
+                // test infrastructure.
+                if is_mod {
+                    spans.push(block_start..next);
+                }
+                in_cfg_test = false;
+            }
+        }
+    }
+    spans
+}
+
+/// The offset of the first `#` in `content` at or after `from` that may start `#[cfg(` in the
+/// code of its line.
+///
+/// The code of a line joins its runs outside comments and strings, in order. A comment or string
+/// that splits `#[cfg(` opens with `/`, `"` or `'` right after the part of `#[cfg(` before it, and
+/// the rest of `#[cfg(` follows it in order on the line.
+fn next_cfg(content: &[u8], mut from: usize) -> Option<usize> {
+    const CFG: &[u8] = b"#[cfg(";
+    loop {
+        let hash = from + memchr(b'#', content.get(from..)?)?;
+        let text = content.get(hash..)?;
+        let same = text.iter().zip(CFG).take_while(|(byte, expected)| byte == expected).count();
+        let rest = CFG.get(same..).unwrap_or_default();
+        if rest.is_empty()
+            || matches!(text.get(same), Some(b'/' | b'"' | b'\'')) && {
+                let mut line = text.iter().skip(same).take_while(|&&byte| byte != b'\n');
+                rest.iter().all(|expected| line.any(|byte| byte == expected))
+            }
+        {
+            return Some(hash);
+        }
+        from = hash + 1;
     }
 }
 
@@ -179,11 +236,7 @@ fn contains(haystack: &[u8], needle: &[u8]) -> bool {
 
 /// Detect if a line starts a #[cfg(...)] attribute.
 /// Returns the state of the attribute parsing.
-fn detect_cfg_attr_start(
-    line: &[u8],
-    line_idx: usize,
-    nonblank_before: usize,
-) -> Option<CfgAttrState> {
+fn detect_cfg_attr_start(line: &[u8], start: usize) -> Option<CfgAttrState> {
     // Check for #[cfg( pattern
     if !memchr_iter(b'#', line)
         .any(|i| line.get(i..).is_some_and(|rest| rest.starts_with(b"#[cfg(")))
@@ -198,11 +251,7 @@ fn detect_cfg_attr_start(
             CfgAttrState::Complete(is_cfg_test_content(line))
         } else {
             // Multi-line case - attribute continues on next line(s)
-            CfgAttrState::Incomplete(MultiLineAttr {
-                content: line.to_vec(),
-                start_line: line_idx,
-                nonblank_before,
-            })
+            CfgAttrState::Incomplete(MultiLineAttr { content: line.to_vec(), start })
         }
     })
 }
@@ -247,37 +296,6 @@ fn is_mod_item(line: &[u8]) -> bool {
 /// The change in brace depth over a line of code.
 fn count_braces(code: &[u8]) -> i32 {
     code.iter().map(|&b| i32::from(b == b'{') - i32::from(b == b'}')).sum()
-}
-
-/// The line ranges (0-indexed) of the inline test modules of a Rust source file.
-///
-/// A file without `cfg(` has no test modules, unless a block comment splits the attribute, as in
-/// `#[c/* */fg(test)]`, so only a file with one or the other is parsed.
-pub fn test_ranges(content: &[u8]) -> Vec<Range<usize>> {
-    if !contains(content, b"cfg(") && !contains(content, b"/*") {
-        return Vec::new();
-    }
-    CfgTestInfo::parse(content).test_ranges
-}
-
-/// The byte ranges of the inline test modules of a Rust source file, each from the start of its
-/// first line to the start of the line after its last.
-pub fn test_spans(content: &[u8]) -> Vec<Range<usize>> {
-    let ranges = test_ranges(content);
-    if ranges.is_empty() {
-        return ranges;
-    }
-    let mut starts = memchr_iter(b'\n', content).map(|i| i + 1);
-    let (mut line, mut offset) = (0, 0);
-    // The ranges are in order, so the line starts are found in one scan.
-    let mut start_of = |target: usize| {
-        while line < target {
-            offset = starts.next().unwrap_or(content.len());
-            line += 1;
-        }
-        offset
-    };
-    ranges.into_iter().map(|r| start_of(r.start)..start_of(r.end)).collect()
 }
 
 #[cfg(test)]

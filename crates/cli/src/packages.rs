@@ -25,7 +25,8 @@ impl Package {
 pub fn detect(root: &Path, language: Language) -> Vec<Package> {
     let mut packages = match language {
         Language::Rust => cargo_packages(root),
-        Language::Go => go_packages(root),
+        // A Go module's packages are found as its directories are resolved.
+        Language::Go => vec![],
         Language::JavaScript => js_packages(root),
         Language::Python => python_package(root).into_iter().collect(),
         Language::Ruby
@@ -117,31 +118,36 @@ fn cargo_packages(root: &Path) -> Vec<Package> {
     packages
 }
 
-/// Directories with `.go` files, when there is more than one, named by their last component.
-fn go_packages(root: &Path) -> Vec<Package> {
-    fn walk(root: &Path, dir: &Path, packages: &mut Vec<Package>) {
+/// Whether more than one directory below `root`, outside `vendor`, has `.go` files, in which case
+/// each such directory is a package named by its last component.
+///
+/// The search stops at the second such directory, so it reads little of a large module.
+pub fn go_has_packages(root: &Path) -> bool {
+    fn count(dir: &Path, found: &mut usize) {
+        let mut subdirs = Vec::new();
         let mut has_go = false;
         for entry in fs::read_dir(dir).into_iter().flatten().flatten() {
-            let path = entry.path();
-            if entry.file_name() == "vendor" {
+            let name = entry.file_name();
+            if name == "vendor" {
                 continue;
             }
-            if path.is_dir() {
-                walk(root, &path, packages);
-            } else if path.extension().is_some_and(|e| e == "go") {
+            if entry.file_type().is_ok_and(|t| t.is_dir()) {
+                subdirs.push(entry.path());
+            } else if Path::new(&name).extension().is_some_and(|e| e == "go") {
                 has_go = true;
             }
         }
-        if has_go {
-            let rel = dir.strip_prefix(root).unwrap_or(dir).to_string_lossy().into_owned();
-            let rel = if rel.is_empty() { ".".to_string() } else { rel };
-            let name = rel.rsplit('/').next().unwrap_or(&rel).to_string();
-            packages.push(Package::new(rel, name));
+        *found += usize::from(has_go);
+        for subdir in subdirs {
+            if *found > 1 {
+                return;
+            }
+            count(&subdir, found);
         }
     }
-    let mut packages = Vec::new();
-    walk(root, root, &mut packages);
-    if packages.len() > 1 { packages } else { vec![] }
+    let mut found = 0;
+    count(root, &mut found);
+    found > 1
 }
 
 /// Members of a pnpm or npm/yarn workspace that have a `package.json`, named by directory.
@@ -449,14 +455,10 @@ catalog:
 
     #[test]
     fn go_packages_need_more_than_one_directory() {
-        let single = detected(&[("go.mod", ""), ("main.go", "")], Language::Go);
-        assert!(single.is_empty());
-        let found = detected(
-            &[("go.mod", ""), ("main.go", ""), ("pkg/util/u.go", ""), ("vendor/v/v.go", "")],
-            Language::Go,
-        );
-        assert_eq!(found.len(), 2);
-        assert!(found.contains(&("pkg/util".to_string(), "util".to_string())));
+        let single = tree(&[("go.mod", ""), ("main.go", ""), ("vendor/v/v.go", "")]);
+        assert!(!go_has_packages(single.path()));
+        let many = tree(&[("go.mod", ""), ("main.go", ""), ("pkg/util/u.go", "")]);
+        assert!(go_has_packages(many.path()));
     }
 
     #[test]

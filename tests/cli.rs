@@ -251,6 +251,27 @@ fn testbenches_are_tests() {
     assert_eq!(json["totals"]["test"]["files"], 1);
 }
 
+/// A file without an extension that is named like a license or a list of owners is not a script,
+/// even with a `#!` line, but a script with another name is counted in full, and a file that is
+/// counted by its name, such as `Makefile`, is still counted
+#[test]
+fn well_known_names_are_not_scripts() {
+    let script = format!("#!/bin/sh\n{}", "echo hi\n".repeat(40));
+    let temp = tree(&[
+        ("OWNERS", "#!/bin/sh\necho owners\n"),
+        ("license", "#!/bin/sh\necho license\n"),
+        ("LICENSE-MIT", "#!/bin/sh\necho mit\n"),
+        ("bin/notice-check", "#!/bin/sh\necho check\n"),
+        ("bin/long", &script),
+        ("Makefile", "all:\n\techo hi\n"),
+    ]);
+
+    let json = cloc_json(temp.path());
+    assert_eq!(language(&json, "Shell", "source")["files"], 2);
+    assert_eq!(language(&json, "Shell", "source")["code"], 41);
+    assert_eq!(language(&json, "Makefile", "other")["code"], 2);
+}
+
 /// A monorepo without a root manifest is broken down by the packages of its nested projects
 #[test]
 fn breaks_down_nested_projects() {
@@ -402,6 +423,34 @@ fn counts_a_file_as_its_directory() {
     let json = count("src/lib.rs");
     assert_eq!(json, count("src"));
     assert_eq!(language(&json, "Rust", "test")["code"], 3);
+}
+
+/// A relative path is counted as its absolute path is, with the ignore files above it and the
+/// package names of the manifests below it, from the directory itself or from one inside it
+#[test]
+fn relative_paths_count_as_absolute_paths() {
+    let temp = tree(&[
+        (".ignore", "skipped.rs\n"),
+        ("crates/a/Cargo.toml", "[package]\nname = \"crate-a\"\n"),
+        ("crates/a/src/lib.rs", "pub fn a() {}\n"),
+        ("crates/a/src/skipped.rs", "fn b() {}\n"),
+        ("crates/b/Cargo.toml", "[package]\nname = \"crate-b\"\n"),
+        ("crates/b/tests/t.rs", "fn t() {}\n"),
+    ]);
+    let count = |dir: &Path, path: &Path| {
+        let output = ripcloc().args(["-o", "json"]).arg(path).current_dir(dir).output().unwrap();
+        assert!(output.status.success());
+        serde_json::from_slice::<serde_json::Value>(&output.stdout).unwrap()
+    };
+    let crates = temp.path().join("crates");
+    let json = count(temp.path(), &crates);
+    assert_eq!(json, count(temp.path(), Path::new("crates")));
+    assert_eq!(json, count(temp.path(), Path::new("./crates/")));
+    assert_eq!(json, count(&crates, Path::new(".")));
+    assert_eq!(json, count(&crates.join("a/src"), Path::new("../..")));
+    assert_eq!(language(&json, "Rust", "source")["files"], 1);
+    assert_eq!(language(&json, "Rust", "source")["packages"][0]["name"], "crate-a");
+    assert_eq!(language(&json, "Rust", "test")["packages"][0]["name"], "crate-b");
 }
 
 /// A symlink found while walking is not followed, so its target is not counted twice, but a
