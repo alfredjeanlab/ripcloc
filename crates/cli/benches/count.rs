@@ -15,15 +15,19 @@
 
 use std::hint::black_box;
 
-#[allow(dead_code)]
-#[path = "../src/cloc.rs"]
-mod cloc;
+/// The modules of the binary that counting needs. They are declared inside a module whose path is
+/// `src`, so that their own submodules, such as `syntax/languages.rs`, are found where the binary
+/// finds them. The benchmark calls only part of them, so the rest would warn as unused.
+#[allow(dead_code, unused_imports)]
+#[path = "../src"]
+mod src {
+    pub mod cfg_test;
+    pub mod syntax;
+}
 
-#[allow(dead_code)]
-#[path = "../src/cfg_test.rs"]
-mod cfg_test;
+use src::{cfg_test, syntax};
 
-use cloc::LineCounts;
+use syntax::LineCounts;
 
 /// The number of files in each input, which makes each input a few hundred kilobytes.
 const FILES: usize = 40;
@@ -114,7 +118,7 @@ fn count(input: &str, sources: &Sources) -> Option<(LineCounts, LineCounts)> {
     for file in files {
         let (lines, tests) = match input {
             "rs" => cfg_test::count(black_box(file.as_bytes())),
-            _ => (cloc::count_lines(black_box(file), input), LineCounts::default()),
+            _ => (syntax::count_lines(black_box(file), input), LineCounts::default()),
         };
         counts.add(lines);
         test.add(tests);

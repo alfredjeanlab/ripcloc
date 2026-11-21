@@ -5,11 +5,12 @@
 
 mod args;
 mod cfg_test;
-mod cloc;
 mod color;
 mod lang;
+mod notebook;
 mod packages;
 mod project;
+mod syntax;
 
 use std::collections::{BTreeMap, HashMap};
 use std::fmt::Write as _;
@@ -23,9 +24,9 @@ use ignore::{WalkBuilder, WalkState};
 use serde_json::{Map, Value, json};
 
 use args::{Args, Format};
-use cloc::LineCounts;
 use lang::{Classifier, DirKind, Language};
 use project::Resolver;
+use syntax::LineCounts;
 
 /// The version of the JSON report's shape. It changes only when a field is removed or changes
 /// meaning, never when counts change or a field is added.
@@ -183,9 +184,66 @@ impl Row {
     }
 }
 
+/// The report of every language and format that is counted, with its extensions and file names,
+/// and whether its files are split into source and tests or counted as other.
+///
+/// The text has a row for each, sorted by name, with its extensions and then, after `named`, its
+/// file names. An extension that the content decides is marked `(by content)`. A language whose
+/// files are counted in two ways, such as Terraform's code and configuration, has a row for each,
+/// and its name only on the first.
+fn languages_report(format: Format) -> anyhow::Result<String> {
+    let mut languages: Vec<_> = syntax::LANGUAGES.iter().collect();
+    languages.sort_by_key(|l| (l.name.to_lowercase(), !l.split));
+    let kind = |split: bool| if split { "source and tests" } else { "other" };
+    let mut out = String::new();
+    match format {
+        Format::Json => {
+            let languages: Vec<Value> = languages
+                .iter()
+                .map(|l| {
+                    json!({
+                        "language": l.name,
+                        "kind": if l.split { "split" } else { "other" },
+                        "extensions": l.extensions,
+                        "extensions_by_content": l.shared,
+                        "names": l.names,
+                    })
+                })
+                .collect();
+            let report = json!({ "schema": SCHEMA, "languages": languages });
+            writeln!(out, "{}", serde_json::to_string_pretty(&report)?)?;
+        }
+        Format::Text => {
+            let width = languages.iter().map(|l| l.name.chars().count()).fold(8, usize::max);
+            let kind_width = kind(true).len();
+            writeln!(
+                out,
+                "{:<width$}  {:<kind_width$}  Extensions and file names",
+                "Language", "Counted as"
+            )?;
+            let mut previous = None;
+            for l in languages {
+                let extensions = l.extensions.iter().map(|e| format!(".{e}"));
+                let shared = l.shared.iter().map(|e| format!(".{e} (by content)"));
+                let names = (!l.names.is_empty()).then(|| format!("named {}", l.names.join(" ")));
+                let files: Vec<_> = extensions.chain(shared).chain(names).collect();
+                let name = if previous == Some(l.name) { "" } else { l.name };
+                previous = Some(l.name);
+                let row =
+                    format!("{name:<width$}  {:<kind_width$}  {}", kind(l.split), files.join(" "));
+                writeln!(out, "{}", row.trim_end())?;
+            }
+        }
+    }
+    Ok(out)
+}
+
 fn main() -> anyhow::Result<()> {
     let mut args = Args::parse();
     // The listing of `--languages` belongs here, before any path is read.
+    if args.languages {
+        return write_report(&languages_report(args.output)?);
+    }
     if args.compact {
         args.no_attribution = true;
         args.depth = args.depth.or(Some(0));
@@ -389,8 +447,14 @@ fn main() -> anyhow::Result<()> {
             writeln!(out, "{rule}\n{}\n{rule}", total.text("Total", width))?;
         }
     }
+    write_report(&out)
+}
+
+/// Write `report` to standard output at once, so that a reader that closes early is handled in
+/// one place.
+fn write_report(report: &str) -> anyhow::Result<()> {
     let mut stdout = std::io::stdout().lock();
-    match stdout.write_all(out.as_bytes()).and_then(|()| stdout.flush()) {
+    match stdout.write_all(report.as_bytes()).and_then(|()| stdout.flush()) {
         // A reader that stops early, such as `head`, has read all that it wanted.
         Err(e) if e.kind() == ErrorKind::BrokenPipe => Ok(()),
         written => Ok(written?),
@@ -519,9 +583,9 @@ fn count_file(
     unreadable: &mut usize,
     buffer: &mut Vec<u8>,
 ) {
-    let mut key = cloc::file_key(path);
+    let mut key = syntax::file_key(path);
     let script = key.is_empty();
-    if script && is_never_script(path) || !script && !cloc::is_counted(&key) {
+    if script && is_never_script(path) || !script && !syntax::is_counted(&key) {
         return;
     }
     let content = match read(path, max_bytes, script, buffer) {
@@ -534,7 +598,7 @@ fn count_file(
     };
     if script {
         let start = content.get(..SHEBANG_PREFIX).unwrap_or(content);
-        let Some(shebang) = cloc::shebang_key(start).filter(|k| cloc::is_counted(k)) else {
+        let Some(shebang) = syntax::shebang_key(start).filter(|k| syntax::is_counted(k)) else {
             return;
         };
         key = shebang.to_string();
@@ -548,9 +612,19 @@ fn count_file(
         None if is_binary(content) => return,
         None => content,
     };
-    // Coq and Verilog share the extension `.v`, so the content tells them apart.
-    if key == "v" {
-        key = cloc::v_key(content).to_string();
+    // Coq and Verilog share the extension `.v`, Perl and Prolog share `.pl`, and D shares `.d`
+    // with the lists of dependencies that compilers write, so the content tells them apart. A
+    // notebook is counted here, since one that is not valid JSON is not counted at all.
+    let mut notebook = None;
+    match key.as_str() {
+        "v" => key = syntax::v_key(content).to_string(),
+        "pl" => key = syntax::pl_key(content).to_string(),
+        "d" if syntax::is_make_dependencies(content) => return,
+        "ipynb" => {
+            let Some(counts) = notebook::count(content) else { return };
+            notebook = Some(counts);
+        }
+        _ => {}
     }
     let Some(context) = path.parent().map(|dir| resolver.context(dir)) else { return };
     let from = |base: &Path| path.strip_prefix(base).unwrap_or(path);
@@ -564,8 +638,8 @@ fn count_file(
     // A file is counted once, in the row that its path decides. Only its lines are divided: the
     // lines of a Rust source file's inline test modules count as tests.
     let kind = |is_test: bool| if is_test { Kind::Test } else { Kind::Source };
-    let lines = || cloc::count_lines(content, &key);
-    let parts = if !cloc::is_split(&key) {
+    let lines = || notebook.unwrap_or_else(|| syntax::count_lines(content, &key));
+    let parts = if !syntax::is_split(&key) {
         vec![(Kind::Other, 1, lines())]
     } else if !attribute {
         vec![(Kind::Code, 1, lines())]
@@ -576,7 +650,7 @@ fn count_file(
         vec![(kind(is_test()), 1, lines())]
     };
 
-    let language_name = cloc::language_name(&key);
+    let language_name = syntax::language_name(&key);
     for (kind, files, lines) in parts {
         if files == 0 && lines == LineCounts::default() {
             continue;

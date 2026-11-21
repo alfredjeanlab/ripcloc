@@ -744,6 +744,27 @@ fn colors_help_only_when_asked() {
     assert_eq!(stripped.collect::<String>(), plain);
 }
 
+/// `--languages` names each language once, even one whose files are counted in two ways
+#[test]
+fn languages_lists_each_name_once() {
+    let output = ripcloc().arg("--languages").output().unwrap();
+    let text = String::from_utf8(output.stdout).unwrap();
+    let names: Vec<&str> = text
+        .lines()
+        .skip(1)
+        .filter(|l| !l.starts_with(' '))
+        .filter_map(|l| l.split("  ").next())
+        .collect();
+    let mut sorted = names.clone();
+    sorted.dedup();
+    assert_eq!(names, sorted, "{text}");
+    let terraform = text.lines().position(|l| l.starts_with("Terraform ")).unwrap();
+    assert!(
+        text.lines().nth(terraform + 1).is_some_and(|l| l.starts_with(' ') && l.contains(".hcl")),
+        "{text}"
+    );
+}
+
 /// Without a `--depth`, a language with less than 1% of the report's lines is one row, and with a
 /// `--depth` it is broken down
 #[test]
@@ -1299,4 +1320,127 @@ fn accepts_languages_and_deps() {
         let output = ripcloc().arg(flag).current_dir(fixture("cloc-cmd")).output().unwrap();
         assert_eq!(output.status.code(), Some(0), "{flag}");
     }
+}
+
+/// A file named like a build script or a shell startup file is counted by its name, a `.d` file
+/// that lists a target's dependencies is not D, and a hidden startup file is counted when a path
+/// names it, although walking skips it
+#[test]
+fn counts_files_by_name_and_tells_d_from_dependency_lists() {
+    let temp = tree(&[
+        ("Jenkinsfile", "// c\npipeline {\n}\n"),
+        ("test/groovy/ASpec.groovy", "class ASpec {}\n"),
+        ("SConstruct", "# c\nenv = Environment()\n"),
+        ("justfile", "build:\n    cargo build\n"),
+        ("dotfiles/bashrc", "# c\nalias ll='ls -l'\n"),
+        (".zshrc", "export A=1\n"),
+        ("src/app.d", "module app;\nvoid main() {}\n"),
+        ("obj/app.d", "obj/app.o: src/app.d \\\n  src/b.d\n"),
+    ]);
+    let json = cloc_json(temp.path());
+    assert_eq!(language(&json, "Groovy", "source")["code"], 2);
+    assert_eq!(language(&json, "Groovy", "test")["files"], 1);
+    assert_eq!(language(&json, "SCons", "other")["code"], 1);
+    assert_eq!(language(&json, "Just", "other")["code"], 2);
+    assert_eq!(language(&json, "Shell", "source")["files"], 1);
+    assert_eq!(language(&json, "D", "source")["files"], 1);
+    assert_eq!(json["totals"]["total"]["files"], 6);
+
+    // With a directory among the paths, the files are found by walking.
+    for args in [&[".zshrc"][..], &[".zshrc", "src"]] {
+        let output =
+            ripcloc().args(["-o", "json"]).args(args).current_dir(temp.path()).output().unwrap();
+        let json: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
+        assert_eq!(language(&json, "Shell", "source")["code"], 1, "{args:?}");
+    }
+}
+
+/// `--languages` lists every language with its extensions and file names, and whether it is split
+/// into source and tests, without counting any path
+#[test]
+fn lists_languages() {
+    let output = ripcloc().args(["--languages", "-o", "json", "no/such/path"]).output().unwrap();
+    assert!(output.status.success());
+    let json: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
+    let find = |name: &str| {
+        let languages = json["languages"].as_array().unwrap();
+        languages.iter().find(|l| l["language"] == name).unwrap_or_else(|| panic!("{name}")).clone()
+    };
+    assert!(find("Rust")["extensions"].as_array().unwrap().contains(&"rs".into()));
+    assert_eq!(find("Rust")["kind"], "split");
+    assert!(find("Makefile")["names"].as_array().unwrap().contains(&"Makefile".into()));
+    assert_eq!(find("Makefile")["kind"], "other");
+    assert!(find("Coq")["extensions_by_content"].as_array().unwrap().contains(&"v".into()));
+
+    let output = ripcloc().arg("--languages").output().unwrap();
+    let text = String::from_utf8(output.stdout).unwrap();
+    let row = |name: &str| {
+        let row = text.lines().find(|l| l.split("  ").next() == Some(name));
+        row.unwrap_or_else(|| panic!("no {name} row in {text}")).to_string()
+    };
+    assert!(row("Rust").contains(".rs") && row("Rust").contains("source and tests"));
+    assert!(row("Groovy").ends_with(".gsh named Jenkinsfile"));
+    assert!(row("Shell").contains(".tcsh named .bashrc") && row("Shell").contains(" bashrc"));
+    assert!(row("Prolog").contains(".pl (by content)"));
+}
+
+/// Meson and Vim script are counted by the names of their files, as well as by extension
+#[test]
+fn counts_meson_and_vim_files_by_name() {
+    let temp = tree(&[
+        ("meson.build", "# c\nproject('x', 'c')\n"),
+        ("sub/meson_options.txt", "option('a', type: 'boolean')\n"),
+        ("meson.options", "option('b', type: 'string')\n"),
+        ("vimrc", "\" c\nset nocompatible\n"),
+        ("_gvimrc", "set guifont=Mono\n"),
+        ("plugin/a.vim", "vim9script\n# c\nvar x = 1\n"),
+        ("notes.txt", "not counted\n"),
+    ]);
+    let json = cloc_json(temp.path());
+    let meson = language(&json, "Meson", "other");
+    assert_eq!((meson["files"].as_u64(), meson["comment"].as_u64()), (Some(3), Some(1)));
+    let vim = language(&json, "Vim Script", "source");
+    assert_eq!((vim["files"].as_u64(), vim["comment"].as_u64()), (Some(3), Some(2)));
+    assert_eq!(json["totals"]["total"]["files"], 6);
+}
+
+/// A `.pl` file is Prolog or Perl by its content
+#[test]
+fn tells_prolog_from_perl() {
+    let temp = tree(&[
+        ("prolog/lists.pl", ":- module(lists, [app/3]).\n% c\napp([], L, L).\n"),
+        ("prolog/tests/test_lists.pl", ":- use_module(lists).\n"),
+        ("scripts/gen.pl", "#!/usr/bin/perl\nuse strict;\nmy $x = 1;\n"),
+        ("scripts/short.pl", "1;\n"),
+    ]);
+    let json = cloc_json(temp.path());
+    let prolog = language(&json, "Prolog", "source");
+    assert_eq!((prolog["files"].as_u64(), prolog["comment"].as_u64()), (Some(1), Some(1)));
+    assert_eq!(language(&json, "Prolog", "test")["files"], 1);
+    assert_eq!(language(&json, "Perl", "source")["files"], 2);
+}
+
+/// A notebook's cells are counted, without its outputs, and a notebook that is not valid JSON is
+/// not counted
+#[test]
+fn counts_the_cells_of_notebooks() {
+    let notebook = r##"{"cells": [
+        {"cell_type": "markdown", "metadata": {}, "source": ["# Title\n", "\n", "Prose.\n"]},
+        {"cell_type": "code", "metadata": {}, "execution_count": 1,
+         "outputs": [{"output_type": "stream", "name": "stdout", "text": ["a\n", "b\n"]}],
+         "source": ["# c\n", "x = 1\n", "print(x)\n"]}
+    ], "metadata": {"language_info": {"name": "python"}}, "nbformat": 4, "nbformat_minor": 5}"##;
+    let temp = tree(&[
+        ("analysis.ipynb", notebook),
+        ("tests/check.ipynb", notebook),
+        ("broken.ipynb", "{\"cells\": [\n"),
+    ]);
+    let json = cloc_json(temp.path());
+    let source = language(&json, "Jupyter Notebook", "source");
+    let lines = |row: &serde_json::Value| {
+        ["files", "blank", "comment", "code"].map(|k| row[k].as_u64().unwrap())
+    };
+    assert_eq!(lines(source), [1, 1, 3, 2]);
+    assert_eq!(lines(language(&json, "Jupyter Notebook", "test")), [1, 1, 3, 2]);
+    assert_eq!(json["totals"]["total"]["files"], 2);
 }

@@ -10,7 +10,7 @@ use std::ops::Range;
 
 use memchr::{memchr, memchr_iter, memchr2, memmem};
 
-use crate::cloc::{self, CodeLines, LineCounts, trim};
+use crate::syntax::{self, CodeLines, LineCounts, trim};
 
 /// State for tracking multi-line attribute parsing.
 struct MultiLineAttr {
@@ -25,7 +25,7 @@ struct MultiLineAttr {
 pub fn count(content: &[u8]) -> (LineCounts, LineCounts) {
     let content = content.strip_prefix(b"\xEF\xBB\xBF").unwrap_or(content);
     let mut code_starts = Vec::new();
-    let counts = cloc::count_in(content, "rs", Some(&mut code_starts));
+    let counts = syntax::count_in(content, "rs", Some(&mut code_starts));
     // The counts of the lines before `offset`, when a line in `code_starts` or the end is there.
     let before = |offset: usize| match code_starts.binary_search_by_key(&offset, |&(at, _)| at) {
         Ok(i) => code_starts.get(i).map(|&(_, counts)| counts),
@@ -37,7 +37,7 @@ pub fn count(content: &[u8]) -> (LineCounts, LineCounts) {
         // the file as alone, which are those before the line after it less those before it.
         test.add(match (before(span.start), before(span.end)) {
             (Some(first), Some(after)) => after.without(first),
-            _ => cloc::count_lines(content.get(span).unwrap_or_default(), "rs"),
+            _ => syntax::count_lines(content.get(span).unwrap_or_default(), "rs"),
         });
     }
     (counts, test)
@@ -50,7 +50,7 @@ pub fn count(content: &[u8]) -> (LineCounts, LineCounts) {
 /// lines, and it ends at the brace that brings the depth of the braces outside comments and
 /// strings back to 0. A module declared without a body, as in `mod tests;`, is not one.
 ///
-/// Lexing starts afresh at the lines in `code_starts`, which [`cloc::count_in`] pushes, and skips
+/// Lexing starts afresh at the lines in `code_starts`, which [`syntax::count_in`] pushes, and skips
 /// to the last of them before the next byte that matters. Only the lines from there to that byte
 /// are lexed.
 pub fn test_spans(content: &[u8], code_starts: &[(usize, LineCounts)]) -> Vec<Range<usize>> {
@@ -299,5 +299,4 @@ fn count_braces(code: &[u8]) -> i32 {
 }
 
 #[cfg(test)]
-#[path = "cfg_test_tests.rs"]
 mod tests;

@@ -31,7 +31,7 @@ Options:
                           as generated code and data [default: skip files over 1 GiB]
       --[no-]deps         Count dependency directories, such as vendor/, node_modules/ and
                           Python virtual environments, unless ignored [default: off]
-      --languages         Print the languages that ripcloc counts and exit
+      --languages         Print the languages and file names that ripcloc counts, and exit
   -h, --help              Print this help and exit
   -V, --version           Print the version and exit
 ";

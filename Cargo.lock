@@ -235,6 +235,7 @@ dependencies = [
  "ignore",
  "lexopt",
  "memchr",
+ "serde_core",
  "serde_json",
  "tempfile",
  "toml",

@@ -16,7 +16,7 @@ impl CfgTestInfo {
     fn parse(content: &(impl AsRef<[u8]> + ?Sized)) -> Self {
         let content = content.as_ref();
         let mut code_starts = Vec::new();
-        cloc::count_in(content, "rs", Some(&mut code_starts));
+        syntax::count_in(content, "rs", Some(&mut code_starts));
         let spans = test_spans(content, &[]);
         assert_eq!(test_spans(content, &code_starts), spans);
         // The index of the line that starts at `offset`, or of the line after the last at the end.
@@ -43,9 +43,9 @@ fn counted_alone(content: &str) -> (LineCounts, LineCounts) {
     let content = content.strip_prefix('\u{feff}').unwrap_or(content);
     let mut test = LineCounts::default();
     for span in test_spans(content.as_bytes(), &[]) {
-        test.add(cloc::count_lines(&content[span], "rs"));
+        test.add(syntax::count_lines(&content[span], "rs"));
     }
-    (cloc::count_lines(content, "rs"), test)
+    (syntax::count_lines(content, "rs"), test)
 }
 
 #[test]
