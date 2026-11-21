@@ -1,0 +1,259 @@
+date: 2026-11-20T20:01:51Z
+kernel: Linux 7.0.0-30-generic
+cpu: AMD EPYC-Milan Processor, cpus 1-15 of 16
+memory: 61G
+ripcloc: ripcloc 1.0.0
+tokei: tokei 15.0.0 compiled with serialization support: json
+scc: scc version 4.1.0
+cloc: 2.10
+corpus cloc: 414fe1617b75fa2847844295ac423180db9ca4ea
+corpus cpython: b09a7e92fb0ab958a52ad94e376402cdd3da09b2
+corpus element-plus: 304b9adecf63bd2f87ed70c5670aaeeffa88977e
+corpus flutter: f4998a602f521d4cf07284364eaa27d9d2f2a0b6
+corpus kubernetes: dee14a0ede00099d6441a8991ad6137b938d2a9d
+corpus linux: 4405c18c95d2d0f99f6c581ef0ee8591a1aa6ccd
+corpus okhttp: aa0888e202350532463981d8e51125f54bdce777
+corpus polyglot/batteries: 87486d547af639cb39c01f0d2f8025aa47d7dde1
+corpus polyglot/cats: 64a3c218bcf9bb0a4218bb2c763154a1daa54c2d
+corpus polyglot/clojure: 0934fb7b08f4117a4af1848adef288683e3d5038
+corpus polyglot/dart-sass: 6019767566da18474530d1eda8578eee9ac4355d
+corpus polyglot/dataframes: bb31a8be88e7a915ad25cf2266a654896179fb59
+corpus polyglot/dune: ed09b9fbad658339223ecc27e484a7b36dc9ff1e
+corpus polyglot/elixir: 04a9f6dac1df7625b2ab6fe6728f6b7803e22eb9
+corpus polyglot/ggplot2: 87a95d9103536296c8334e72f9f722855cd16bcb
+corpus polyglot/home-manager: 2b13c9cb3aa20653e6f8ee0b7f8331a53ea9b0a9
+corpus polyglot/ibex: f5b1439295048c6eead73ad4ef8a55cc564e7d6f
+corpus polyglot/laravel: ea423c40a6461843b7395fa94628b0ae48344e23
+corpus polyglot/less: 713331655e437401dfea6cd233893a69762734e1
+corpus polyglot/mdx: 52285a6758fa078ec57f3d4bd8803d9cbfb12065
+corpus polyglot/openzeppelin: d98b8f438d6c2b9d368d1220448b8519f733d371
+corpus polyglot/pandoc: de38596d097cdfca456f7b916c6e32deaf6913ca
+corpus polyglot/terraform-aws-eks: 25c846a384bc66d16cc801d2f851431deb38de5d
+corpus polyglot/texture: d8aa8c796dd7770ea177989253ef1cf8878cd50a
+corpus polyglot/tigerbeetle: a2a3c7064519e08233abe26c54a43fca2f9ad9bc
+corpus polyglot/verilog-ethernet: 77320a9471d19c7dd383914bc049e02d9f4f1ffb
+corpus rails: 78f4f0df59866e8951646183c1f275e186916ba7
+corpus react: 63d9c806be677e9c2394696ca4a91f52e01eec6d
+corpus react-native: bbfd391496baa6e0461262f76f1ae9a819a7ecd2
+corpus ripcloc: 26dfd29ea3dc3b43dd171bd7244dcf696e105480
+corpus ripgrep: 4933645d81498e53ea150f96bde5860f6dcb2e5f
+corpus roslyn: d51efc5b66442fea21728c71f9a1fc98ee5fed32
+corpus rust: 65ce8611fed3142053320be6996ef00e9992671f
+corpus spring: 0dbaf9ca5713b47955da988ac9f63cd0ae6dd0de
+corpus svelte: a0823d965a7894b621e0e30ad845ddd5a05d9d39
+corpus swiftpm: 767391fa8ed575c94a8719ec13580287bdb2b323
+corpus vue: 942d307f64660bc3438dfede3c17ae0fb31c3655
+
+large_c (sqlite-amalgamation-3500400/sqlite3.c)
+-----------------------------------------------
+ripcloc -c*   0.0306 +/- 0.0085     12.6 MiB  (files: 1, code: 165,971)
+ripcloc       0.0316 +/- 0.0085     13.0 MiB  (files: 1, code: 165,971)
+scc           0.0801 +/- 0.0068     24.9 MiB  (files: 1, code: 165,971)
+tokei         0.1133 +/- 0.0098     15.1 MiB  (files: 1, code: 171,935)
+cloc          0.8240               192.1 MiB  (files: 1, code: 165,961)
+
+large_rust (rust/library/stdarch/crates/core_arch/src/x86/avx512f.rs)
+---------------------------------------------------------------------
+ripcloc -c*   0.0108 +/- 0.0002      6.5 MiB  (files: 1, code: 48,200)
+ripcloc       0.0138 +/- 0.0010      7.6 MiB  (files: 1, code: 48,200)
+tokei         0.0455 +/- 0.0033     10.2 MiB  (files: 1, code: 48,200)
+scc           0.0472 +/- 0.0096     19.4 MiB  (files: 1, code: 48,200)
+cloc          0.2675                70.2 MiB  (files: 1, code: 48,200)
+
+large_ts (typescript-5.6.3/checker.ts)
+--------------------------------------
+ripcloc -c*   0.0111 +/- 0.0003      6.6 MiB  (files: 1, code: 42,977)
+ripcloc       0.0119 +/- 0.0001      7.1 MiB  (files: 1, code: 42,977)
+tokei         0.0371 +/- 0.0013     10.0 MiB  (files: 1, code: 42,977)
+scc           0.0507 +/- 0.0069     18.8 MiB  (files: 1, code: 42,977)
+cloc          0.2903                66.0 MiB  (files: 1, code: 42,977)
+
+small_file (ripgrep/crates/core/main.rs)
+----------------------------------------
+ripcloc -c*   0.0025 +/- 0.0005      3.8 MiB  (files: 1, code: 335)
+ripcloc       0.0029 +/- 0.0009      4.2 MiB  (files: 1, code: 335)
+tokei         0.0075 +/- 0.0013      5.2 MiB  (files: 1, code: 335)
+scc           0.0193 +/- 0.0043     16.2 MiB  (files: 1, code: 335)
+cloc          0.1175                23.3 MiB  (files: 1, code: 335)
+
+ripcloc (ripcloc)
+-----------------
+ripcloc -c*   0.0065 +/- 0.0009      4.4 MiB  (files: 23, code: 2,823)
+ripcloc       0.0067 +/- 0.0006      4.4 MiB  (files: 23, code: 2,823)
+tokei         0.0098 +/- 0.0004      5.9 MiB  (files: 23, code: 2,869)
+scc           0.0270 +/- 0.0030     20.3 MiB  (files: 26, code: 2,925)
+cloc          1.0631                23.4 MiB  (files: 25, code: 2,835)
+
+cloc (cloc)
+-----------
+ripcloc -c*   0.0109 +/- 0.0013      6.5 MiB  (files: 701, code: 57,397)
+ripcloc       0.0111 +/- 0.0013      6.9 MiB  (files: 701, code: 57,397)
+tokei         0.0190 +/- 0.0026      8.4 MiB  (files: 885, code: 26,302)
+scc           0.0828 +/- 0.0124     70.3 MiB  (files: 894, code: 64,359)
+cloc          6.4910                34.0 MiB  (files: 951, code: 65,969)
+
+grep (grep-3.12)
+----------------
+ripcloc -c*   0.0080 +/- 0.0009      7.4 MiB  (files: 1,371, code: 217,643)
+ripcloc       0.0084 +/- 0.0010      7.9 MiB  (files: 1,371, code: 217,643)
+tokei         0.0201 +/- 0.0031      9.9 MiB  (files: 1,382, code: 230,508)
+scc           0.0264 +/- 0.0049     35.5 MiB  (files: 1,382, code: 261,404)
+cloc          0.8739                49.2 MiB  (files: 1,420, code: 257,611)
+
+ripgrep (ripgrep)
+-----------------
+ripcloc -c*   0.0094 +/- 0.0012      5.3 MiB  (files: 154, code: 46,979)
+ripcloc       0.0104 +/- 0.0011      6.2 MiB  (files: 154, code: 46,979)
+tokei         0.0199 +/- 0.0013      8.1 MiB  (files: 154, code: 43,315)
+scc           0.0343 +/- 0.0067     26.2 MiB  (files: 193, code: 54,048)
+cloc          1.2389                28.7 MiB  (files: 169, code: 51,383)
+
+react (react)
+-------------
+ripcloc -c*   0.0209 +/- 0.0014      9.9 MiB  (files: 6,963, code: 831,325)
+ripcloc       0.0220 +/- 0.0008     10.6 MiB  (files: 6,963, code: 831,325)
+scc           0.0512 +/- 0.0014     48.1 MiB  (files: 7,058, code: 825,668)
+tokei         0.0544 +/- 0.0009     18.0 MiB  (files: 6,988, code: 778,235)
+cloc          3.6258                40.4 MiB  (files: 6,850, code: 830,227)
+
+vue (vue)
+---------
+ripcloc -c*   0.0082 +/- 0.0008      5.9 MiB  (files: 627, code: 158,408)
+ripcloc       0.0091 +/- 0.0011      6.6 MiB  (files: 627, code: 158,408)
+tokei         0.0188 +/- 0.0016      9.4 MiB  (files: 628, code: 154,357)
+scc           0.0262 +/- 0.0042     28.6 MiB  (files: 659, code: 155,072)
+cloc          0.6816                28.8 MiB  (files: 640, code: 159,168)
+
+element_plus (element-plus)
+---------------------------
+ripcloc -c*   0.0111 +/- 0.0006      6.2 MiB  (files: 2,302, code: 224,096)
+ripcloc       0.0120 +/- 0.0004      7.0 MiB  (files: 2,302, code: 224,096)
+scc           0.0274 +/- 0.0039     30.3 MiB  (files: 2,671, code: 237,583)
+tokei         0.0307 +/- 0.0018     12.3 MiB  (files: 2,311, code: 210,972)
+cloc          1.2091                32.4 MiB  (files: 2,640, code: 248,665)
+
+svelte (svelte)
+---------------
+ripcloc -c*   0.0367 +/- 0.0014      7.2 MiB  (files: 9,847, code: 236,406)
+ripcloc       0.0402 +/- 0.0045      8.1 MiB  (files: 9,847, code: 236,406)
+scc           0.0505 +/- 0.0097     44.5 MiB  (files: 9,884, code: 236,503)
+tokei         0.0893 +/- 0.0048     22.4 MiB  (files: 9,847, code: 226,285)
+cloc          1.8608                34.7 MiB  (files: 9,103, code: 232,319)
+
+rails (rails)
+-------------
+ripcloc -c*   0.0158 +/- 0.0007      7.6 MiB  (files: 4,547, code: 517,499)
+ripcloc       0.0165 +/- 0.0005      8.5 MiB  (files: 4,547, code: 517,499)
+scc           0.0329 +/- 0.0018     39.3 MiB  (files: 4,745, code: 522,842)
+tokei         0.0476 +/- 0.0014     14.6 MiB  (files: 4,566, code: 463,934)
+cloc          2.1994                32.4 MiB  (files: 4,398, code: 516,614)
+
+spring (spring)
+---------------
+ripcloc -c*   0.0330 +/- 0.0009      8.4 MiB  (files: 11,054, code: 977,627)
+ripcloc       0.0339 +/- 0.0005      8.5 MiB  (files: 11,054, code: 977,627)
+scc           0.0667 +/- 0.0025     56.2 MiB  (files: 11,281, code: 992,355)
+tokei         0.1001 +/- 0.0019     16.3 MiB  (files: 11,106, code: 978,025)
+cloc         17.7686                42.6 MiB  (files: 11,204, code: 994,909)
+
+roslyn (roslyn)
+---------------
+ripcloc -c*   0.0956 +/- 0.0027     34.9 MiB  (files: 23,619, code: 7,335,355)
+ripcloc       0.0975 +/- 0.0027     32.1 MiB  (files: 23,619, code: 7,335,355)
+scc           0.2174 +/- 0.0039    108.0 MiB  (files: 33,621, code: 8,224,667)
+tokei         0.3429 +/- 0.0056     56.7 MiB  (files: 33,478, code: 7,499,701)
+cloc         98.0160               175.7 MiB  (files: 32,257, code: 8,598,036)
+
+cpython (cpython)
+-----------------
+ripcloc -c*   0.0252 +/- 0.0005     14.2 MiB  (files: 4,789, code: 2,337,505)
+ripcloc       0.0268 +/- 0.0006     15.2 MiB  (files: 4,789, code: 2,337,505)
+scc           0.0677 +/- 0.0011     60.3 MiB  (files: 5,174, code: 2,422,354)
+tokei         0.1017 +/- 0.0022     25.4 MiB  (files: 5,053, code: 2,331,878)
+cloc         11.2400                72.6 MiB  (files: 5,022, code: 2,137,925)
+
+kubernetes (kubernetes)
+-----------------------
+ripcloc -c*   0.0643 +/- 0.0010     32.0 MiB  (files: 22,618, code: 4,857,020)
+ripcloc       0.0681 +/- 0.0012     30.0 MiB  (files: 22,618, code: 4,857,020)
+scc           0.1758 +/- 0.0018     95.7 MiB  (files: 28,101, code: 6,090,805)
+tokei         0.2735 +/- 0.0071     55.4 MiB  (files: 27,568, code: 5,934,785)
+cloc         62.1054               116.3 MiB  (files: 21,424, code: 5,811,084)
+
+swiftpm (swiftpm)
+-----------------
+ripcloc -c*   0.0163 +/- 0.0007      8.5 MiB  (files: 2,514, code: 353,846)
+ripcloc       0.0167 +/- 0.0003      9.7 MiB  (files: 2,514, code: 353,846)
+scc           0.0315 +/- 0.0022     44.7 MiB  (files: 2,551, code: 356,773)
+tokei         0.0368 +/- 0.0008     12.5 MiB  (files: 2,537, code: 339,121)
+cloc          4.1512                39.1 MiB  (files: 2,390, code: 351,007)
+
+okhttp (okhttp)
+---------------
+ripcloc -c*   0.0143 +/- 0.0009      5.9 MiB  (files: 775, code: 117,861)
+ripcloc       0.0150 +/- 0.0005      6.1 MiB  (files: 775, code: 117,861)
+tokei         0.0395 +/- 0.0028      9.2 MiB  (files: 789, code: 113,578)
+scc           0.0409 +/- 0.0049     27.3 MiB  (files: 808, code: 130,390)
+cloc          0.5450                30.6 MiB  (files: 806, code: 130,280)
+
+react_native (react-native)
+---------------------------
+ripcloc -c*   0.0249 +/- 0.0004     10.2 MiB  (files: 6,614, code: 815,763)
+ripcloc       0.0269 +/- 0.0005     11.0 MiB  (files: 6,614, code: 815,763)
+scc           0.0909 +/- 0.0020     92.6 MiB  (files: 7,697, code: 859,950)
+tokei         0.0931 +/- 0.0064     21.6 MiB  (files: 7,366, code: 817,224)
+cloc          4.6120               103.9 MiB  (files: 7,570, code: 845,567)
+
+flutter (flutter)
+-----------------
+ripcloc -c*   0.0506 +/- 0.0012     19.2 MiB  (files: 12,728, code: 2,799,342)
+ripcloc       0.0538 +/- 0.0011     20.1 MiB  (files: 12,728, code: 2,799,342)
+scc           0.1878 +/- 0.0105    164.2 MiB  (files: 14,256, code: 2,890,645)
+tokei         0.2545 +/- 0.0172     27.6 MiB  (files: 13,569, code: 2,794,865)
+cloc         19.8446                80.0 MiB  (files: 13,026, code: 2,817,524)
+
+polyglot (polyglot)
+-------------------
+ripcloc -c*   0.0646 +/- 0.0009     14.4 MiB  (files: 24,622, code: 3,021,699)
+ripcloc       0.0694 +/- 0.0028     15.7 MiB  (files: 24,622, code: 3,021,699)
+scc           0.1455 +/- 0.0039     99.3 MiB  (files: 28,387, code: 3,556,489)
+tokei         0.2121 +/- 0.0044     33.2 MiB  (files: 25,730, code: 2,983,818)
+cloc         35.8601               135.2 MiB  (files: 25,045, code: 3,196,624)
+
+rust (rust)
+-----------
+ripcloc -c*   0.0937 +/- 0.0033     38.3 MiB  (files: 42,921, code: 4,104,014)
+ripcloc       0.1065 +/- 0.0024     43.6 MiB  (files: 42,921, code: 4,104,014)
+scc           0.1891 +/- 0.0060    129.3 MiB  (files: 44,331, code: 4,216,656)
+tokei         0.3601 +/- 0.0084     99.5 MiB  (files: 43,196, code: 4,036,065)
+cloc         20.4750               248.1 MiB  (files: 43,877, code: 4,163,944)
+
+linux (linux)
+-------------
+ripcloc -c*   0.2183 +/- 0.0069    123.4 MiB  (files: 90,123, code: 33,309,313)
+ripcloc       0.2299 +/- 0.0087     63.1 MiB  (files: 90,123, code: 33,309,313)
+scc           0.6756 +/- 0.0039    363.4 MiB  (files: 91,228, code: 33,464,408)
+tokei         0.9417 +/- 0.0107    271.7 MiB  (files: 91,270, code: 33,396,065)
+cloc        123.4862               337.9 MiB  (files: 84,253, code: 31,429,812)
+
+linux_ch (linux-ch)
+-------------------
+ripcloc*   0.1780 +/- 0.0062     76.4 MiB  (files: 65,049, code: 28,851,688)
+scc        0.4335 +/- 0.0033    323.3 MiB  (files: 65,049, code: 28,851,109)
+tokei      0.7687 +/- 0.0143    260.2 MiB  (files: 65,049, code: 28,856,188)
+cloc     114.6237               320.9 MiB  (files: 64,876, code: 28,836,815)
+
+rust_rs (rust-rs)
+-----------------
+ripcloc*   0.0771 +/- 0.0032     21.1 MiB  (files: 39,802, code: 3,006,997)
+scc        0.1346 +/- 0.0017     78.1 MiB  (files: 39,805, code: 3,027,133)
+tokei      0.2345 +/- 0.0054     70.3 MiB  (files: 39,811, code: 3,034,074)
+cloc      13.8119               138.9 MiB  (files: 39,225, code: 2,993,794)
+
+react_js (react-js)
+-------------------
+ripcloc*   0.0139 +/- 0.0008      7.8 MiB  (files: 4,449, code: 605,633)
+scc        0.0293 +/- 0.0015     31.4 MiB  (files: 4,452, code: 607,682)
+tokei      0.0392 +/- 0.0009     12.0 MiB  (files: 4,449, code: 606,993)
+cloc       2.1770                34.5 MiB  (files: 4,283, code: 600,127)
+

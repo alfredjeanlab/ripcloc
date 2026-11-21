@@ -28,3 +28,7 @@ path = "../../tests/cli.rs"
 
 [lints]
 workspace = true
+
+[[bench]]
+name = "count"
+harness = false

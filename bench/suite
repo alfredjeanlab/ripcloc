@@ -1,0 +1,485 @@
+#!/usr/bin/env python3
+"""Benchmarks ripcloc against other line counters, in the manner of ripgrep's benchsuite.
+
+    bench/suite --dir <corpora> --download                  # about 7 GB
+    bench/suite --dir <corpora> --raw <run>/raw.csv | tee <run>/summary
+    bench/suite --dir <corpora> linux rust                  # some of the benchmarks
+    bench/suite --markdown <run>/raw.csv                    # the results as Markdown tables
+    bench/suite --list
+
+Each corpus is pinned to a commit or release, so that a rerun counts the same files.
+
+Every tool runs with its default settings, since that is what its users see. The tools disagree about which files are
+code, so each result records the files and code lines that the tool counted, and a tool that is fast because it skipped
+work shows it. The equal-work benchmarks count copies of corpora with only the files of languages that every tool
+counts alike, with ripcloc's attribution and size cap and scc's complexity turned off.
+
+The tools run in rounds, each tool once per round, and the tool that goes first moves along by one each round, so that
+a slow drift of the machine favors none of them. The first rounds warm the page cache and are not recorded. On Linux the
+suite pins itself, and so every tool, to the cores in `--cpus`.
+
+Peak resident memory is measured in runs of its own through `/usr/bin/time`. A process spawned by the suite itself would
+report the suite's memory too, since its peak includes the memory that it had before it started the tool.
+"""
+
+import argparse
+import csv
+import fnmatch
+import io
+import json
+import os
+import platform
+import re
+import shutil
+import statistics
+import subprocess
+import sys
+import tarfile
+import time
+import urllib.request
+import zipfile
+from concurrent.futures import ThreadPoolExecutor
+from dataclasses import dataclass
+from datetime import datetime, timezone
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parent.parent
+
+CLONES = {
+    "linux": ("https://github.com/torvalds/linux", "4405c18c95d2d0f99f6c581ef0ee8591a1aa6ccd"),
+    "rust": ("https://github.com/rust-lang/rust", "65ce8611fed3142053320be6996ef00e9992671f"),
+    "react": ("https://github.com/facebook/react", "63d9c806be677e9c2394696ca4a91f52e01eec6d"),
+    "rails": ("https://github.com/rails/rails", "78f4f0df59866e8951646183c1f275e186916ba7"),
+    "ripgrep": ("https://github.com/BurntSushi/ripgrep", "4933645d81498e53ea150f96bde5860f6dcb2e5f"),
+    "cloc": ("https://github.com/AlDanial/cloc", "414fe1617b75fa2847844295ac423180db9ca4ea"),
+    "vue": ("https://github.com/vuejs/core", "942d307f64660bc3438dfede3c17ae0fb31c3655"),
+    "element-plus": ("https://github.com/element-plus/element-plus", "304b9adecf63bd2f87ed70c5670aaeeffa88977e"),
+    "svelte": ("https://github.com/sveltejs/svelte", "a0823d965a7894b621e0e30ad845ddd5a05d9d39"),
+    "cpython": ("https://github.com/python/cpython", "b09a7e92fb0ab958a52ad94e376402cdd3da09b2"),
+    "kubernetes": ("https://github.com/kubernetes/kubernetes", "dee14a0ede00099d6441a8991ad6137b938d2a9d"),
+    "roslyn": ("https://github.com/dotnet/roslyn", "d51efc5b66442fea21728c71f9a1fc98ee5fed32"),
+    "spring": ("https://github.com/spring-projects/spring-framework", "0dbaf9ca5713b47955da988ac9f63cd0ae6dd0de"),
+    "ripcloc": (str(ROOT), "26dfd29ea3dc3b43dd171bd7244dcf696e105480"),
+    "flutter": ("https://github.com/flutter/flutter", "f4998a602f521d4cf07284364eaa27d9d2f2a0b6"),
+    "react-native": ("https://github.com/facebook/react-native", "bbfd391496baa6e0461262f76f1ae9a819a7ecd2"),
+    "okhttp": ("https://github.com/square/okhttp", "aa0888e202350532463981d8e51125f54bdce777"),
+    "swiftpm": ("https://github.com/swiftlang/swift-package-manager", "767391fa8ed575c94a8719ec13580287bdb2b323"),
+    # Projects in languages that the other corpora have few or no files of, which the polyglot benchmark counts
+    # together, since each alone is too quick to time well.
+    "polyglot/batteries": ("https://github.com/leanprover-community/batteries", "87486d547af639cb39c01f0d2f8025aa47d7dde1"),
+    "polyglot/cats": ("https://github.com/typelevel/cats", "64a3c218bcf9bb0a4218bb2c763154a1daa54c2d"),
+    "polyglot/clojure": ("https://github.com/clojure/clojure", "0934fb7b08f4117a4af1848adef288683e3d5038"),
+    "polyglot/dart-sass": ("https://github.com/sass/dart-sass", "6019767566da18474530d1eda8578eee9ac4355d"),
+    "polyglot/dataframes": ("https://github.com/JuliaData/DataFrames.jl", "bb31a8be88e7a915ad25cf2266a654896179fb59"),
+    "polyglot/dune": ("https://github.com/ocaml/dune", "ed09b9fbad658339223ecc27e484a7b36dc9ff1e"),
+    "polyglot/elixir": ("https://github.com/elixir-lang/elixir", "04a9f6dac1df7625b2ab6fe6728f6b7803e22eb9"),
+    "polyglot/ggplot2": ("https://github.com/tidyverse/ggplot2", "87a95d9103536296c8334e72f9f722855cd16bcb"),
+    "polyglot/ibex": ("https://github.com/lowRISC/ibex", "f5b1439295048c6eead73ad4ef8a55cc564e7d6f"),
+    "polyglot/verilog-ethernet": ("https://github.com/alexforencich/verilog-ethernet", "77320a9471d19c7dd383914bc049e02d9f4f1ffb"),
+    "polyglot/home-manager": ("https://github.com/nix-community/home-manager", "2b13c9cb3aa20653e6f8ee0b7f8331a53ea9b0a9"),
+    "polyglot/laravel": ("https://github.com/laravel/framework", "ea423c40a6461843b7395fa94628b0ae48344e23"),
+    "polyglot/less": ("https://github.com/less/less.js", "713331655e437401dfea6cd233893a69762734e1"),
+    "polyglot/mdx": ("https://github.com/mdx-js/mdx", "52285a6758fa078ec57f3d4bd8803d9cbfb12065"),
+    "polyglot/openzeppelin": ("https://github.com/OpenZeppelin/openzeppelin-contracts", "d98b8f438d6c2b9d368d1220448b8519f733d371"),
+    "polyglot/pandoc": ("https://github.com/jgm/pandoc", "de38596d097cdfca456f7b916c6e32deaf6913ca"),
+    "polyglot/terraform-aws-eks": ("https://github.com/terraform-aws-modules/terraform-aws-eks", "25c846a384bc66d16cc801d2f851431deb38de5d"),
+    "polyglot/texture": ("https://github.com/TextureGroup/Texture", "d8aa8c796dd7770ea177989253ef1cf8878cd50a"),
+    "polyglot/tigerbeetle": ("https://github.com/tigerbeetle/tigerbeetle", "a2a3c7064519e08233abe26c54a43fca2f9ad9bc"),
+}
+
+# Copies of corpora with only the files that every tool counts the same, for the equal-work benchmarks.
+COPIES = {
+    "linux-ch": ("linux", ["*.c", "*.h"]),
+    "rust-rs": ("rust", ["*.rs"]),
+    "react-js": ("react", ["*.js", "*.jsx", "*.ts", "*.tsx"]),
+}
+
+
+@dataclass
+class Benchmark:
+    name: str
+    path: str
+    title: str
+    equal: bool = False
+
+
+BENCHMARKS = [
+    Benchmark("large_c", "sqlite-amalgamation-3500400/sqlite3.c", "One large C file, sqlite3.c"),
+    Benchmark("large_rust", "rust/library/stdarch/crates/core_arch/src/x86/avx512f.rs", "One large Rust file, avx512f.rs"),
+    Benchmark("large_ts", "typescript-5.6.3/checker.ts", "One large TypeScript file, checker.ts"),
+    Benchmark("small_file", "ripgrep/crates/core/main.rs", "One small Rust file"),
+    Benchmark("ripcloc", "ripcloc", "ripcloc"),
+    Benchmark("cloc", "cloc", "cloc"),
+    Benchmark("grep", "grep-3.12", "GNU grep 3.12"),
+    Benchmark("ripgrep", "ripgrep", "ripgrep"),
+    Benchmark("react", "react", "react"),
+    Benchmark("vue", "vue", "vue"),
+    Benchmark("element_plus", "element-plus", "element-plus"),
+    Benchmark("svelte", "svelte", "svelte"),
+    Benchmark("rails", "rails", "rails"),
+    Benchmark("spring", "spring", "spring-framework"),
+    Benchmark("roslyn", "roslyn", "roslyn"),
+    Benchmark("cpython", "cpython", "cpython"),
+    Benchmark("kubernetes", "kubernetes", "kubernetes"),
+    Benchmark("swiftpm", "swiftpm", "swift-package-manager"),
+    Benchmark("okhttp", "okhttp", "okhttp"),
+    Benchmark("react_native", "react-native", "react-native"),
+    Benchmark("flutter", "flutter", "flutter"),
+    Benchmark("polyglot", "polyglot", "Projects in less common languages"),
+    Benchmark("rust", "rust", "rust"),
+    Benchmark("linux", "linux", "linux"),
+    Benchmark("linux_ch", "linux-ch", "C and headers in linux", equal=True),
+    Benchmark("rust_rs", "rust-rs", "Rust in rust", equal=True),
+    Benchmark("react_js", "react-js", "JavaScript and TypeScript in react", equal=True),
+]
+
+LINKS = {
+    "ripcloc": "ripcloc",
+    "ripcloc -c": "ripcloc `-c`",
+    "tokei": "[tokei](https://github.com/XAMPPRocky/tokei)",
+    "scc": "[scc](https://github.com/boyter/scc)",
+    "cloc": "[cloc](https://github.com/AlDanial/cloc)",
+}
+
+
+def commands(bench, ripcloc, tools):
+    """The (tool, argv) pairs that `bench` times, in a fixed order."""
+    pairs = []
+    for tool in tools:
+        if tool == "ripcloc":
+            flags = ["--no-attribution", "--large"] if bench.equal else []
+            pairs.append(("ripcloc", [ripcloc, *flags, bench.path]))
+        elif tool == "ripcloc -c":
+            # `-c` is the same work as ripcloc's equal-work command, so it is left out of those benchmarks.
+            if not bench.equal:
+                pairs.append(("ripcloc -c", [ripcloc, "-c", bench.path]))
+        elif tool == "scc":
+            pairs.append(("scc", ["scc", *(["--no-complexity"] if bench.equal else []), bench.path]))
+        else:
+            pairs.append((tool, [tool, bench.path]))
+    return pairs
+
+
+def totals(tool, text):
+    """The files and code lines in the total row of a tool's default text output, or `None` if it has none."""
+    if tool == "cloc":
+        # cloc prints no SUM row for a single language, so its one row of counts is the total.
+        rows = [l.split() for l in text.splitlines() if re.match(r"^\S.*\s\d+\s+\d+\s+\d+\s+\d+$", l)]
+        rows = [r for r in rows if r[0] != "github.com/AlDanial/cloc"]
+        if not rows:
+            return None
+        total = next((r for r in rows if r[0] == "SUM:"), rows[-1])
+        return int(total[-4]), int(total[-1])
+    label, files, code = {"tokei": ("Total", 0, 2)}.get(tool, ("Total", 0, 4))
+    found = None
+    for line in text.splitlines():
+        words = line.split()
+        if words and words[0] == label:
+            found = [int(w.replace(",", "")) for w in words[1:] if re.fullmatch(r"[\d,]+", w)]
+    return (found[files], found[code]) if found else None
+
+
+def run_once(argv, stdout):
+    """Run `argv`, and return its wall time in seconds."""
+    start = time.perf_counter()
+    pid = os.posix_spawnp(argv[0], argv, os.environ, file_actions=[
+        (os.POSIX_SPAWN_DUP2, stdout, 1),
+        (os.POSIX_SPAWN_OPEN, 2, os.devnull, os.O_WRONLY, 0),
+    ])
+    _, status = os.waitpid(pid, 0)
+    elapsed = time.perf_counter() - start
+    if os.waitstatus_to_exitcode(status) != 0:
+        sys.exit(f"{argv} failed with status {status}")
+    return elapsed
+
+
+def peak_memory(argv):
+    """Run `argv` through `/usr/bin/time`, and return its peak resident memory in bytes and its output."""
+    # GNU time reports the peak in KiB, and BSD time on macOS reports it in bytes.
+    flags, scale = (["-l"], 1) if sys.platform == "darwin" else (["-f", "%M"], 1024)
+    run = subprocess.run(["/usr/bin/time", *flags, *argv], capture_output=True)
+    if run.returncode != 0:
+        sys.exit(f"{argv} failed with status {run.returncode}")
+    report = run.stderr.decode(errors="replace").splitlines()
+    if sys.platform == "darwin":
+        peak = next(int(l.split()[0]) for l in report if "maximum resident set size" in l)
+    else:
+        peak = int(report[-1])
+    return peak * scale, run.stdout.decode(errors="replace")
+
+
+def measure(bench, pairs, warmup, rounds, cloc_rounds, memory_runs):
+    """The recorded runs of `bench`, as rows of the raw CSV."""
+    rows = []
+    counts = {}
+
+    def record(tool, argv, kind, round_index, value):
+        files, code = counts[tool] or ("", "")
+        rows.append({
+            "benchmark": bench.name, "tool": tool, "command": " ".join(argv[1:]), "kind": kind,
+            "round": round_index, "value": value, "files": files, "code": code,
+        })
+
+    for round_index in range(memory_runs):
+        for tool, argv in pairs:
+            if tool != "cloc":
+                peak, output = peak_memory(argv)
+                if round_index == 0:
+                    counts[tool] = totals(tool, output)
+                record(tool, argv, "memory", round_index, peak)
+    devnull = os.open(os.devnull, os.O_WRONLY)
+    # cloc is so slow that each of its runs is timed and measured at once, through `/usr/bin/time`, whose own cost is
+    # small beside cloc's. Its runs come after the rounds of the other tools, since a run of cloc between theirs slowed
+    # the next runs of every other tool.
+    rotated = [(tool, argv) for tool, argv in pairs if tool != "cloc"]
+    for round_index in range(warmup + rounds):
+        shift = round_index % len(rotated)
+        for tool, argv in rotated[shift:] + rotated[:shift]:
+            elapsed = run_once(argv, devnull)
+            if round_index >= warmup:
+                record(tool, argv, "time", round_index - warmup, f"{elapsed:.6f}")
+    for tool, argv in pairs:
+        if tool == "cloc":
+            for round_index in range(cloc_rounds):
+                start = time.perf_counter()
+                peak, output = peak_memory(argv)
+                elapsed = time.perf_counter() - start
+                if round_index == 0:
+                    counts[tool] = totals(tool, output)
+                record(tool, argv, "memory", round_index, peak)
+                record(tool, argv, "time", round_index, f"{elapsed:.6f}")
+    os.close(devnull)
+    return rows
+
+
+def environment(corpora, ripcloc, tools, cpus):
+    def version(argv):
+        try:
+            out = subprocess.run(argv, capture_output=True, text=True).stdout
+        except FileNotFoundError:
+            return "missing"
+        return next((l.strip() for l in out.splitlines() if l.strip()), "unknown")
+
+    lines = [f"date: {datetime.now(timezone.utc):%Y-%m-%dT%H:%M:%SZ}", f"kernel: {platform.system()} {platform.release()}"]
+    if Path("/proc/cpuinfo").exists():
+        model = next(l.split(":", 1)[1].strip() for l in open("/proc/cpuinfo") if l.startswith("model name"))
+        memory = os.sysconf("SC_PAGE_SIZE") * os.sysconf("SC_PHYS_PAGES") // 2**30
+        lines += [f"cpu: {model}, cpus {cpus} of {os.cpu_count()}", f"memory: {memory}G"]
+    else:
+        model = version(["sysctl", "-n", "machdep.cpu.brand_string"])
+        lines += [f"cpu: {model}, {os.cpu_count()} cpus"]
+    lines.append(f"ripcloc: {version([ripcloc, '--version'])}")
+    for tool in dict.fromkeys(t for t in tools if not t.startswith("ripcloc")):
+        lines.append(f"{tool}: {version([tool, '--version'])}")
+    for name in sorted(CLONES):
+        repo = corpora / name
+        if (repo / ".git").exists():
+            head = subprocess.run(["git", "-C", repo, "rev-parse", "HEAD"], capture_output=True, text=True).stdout
+            lines.append(f"corpus {name}: {head.strip()}")
+    return lines
+
+
+def seconds(s):
+    return f"{s * 1000:.1f}ms" if s < 1 else f"{s:.3f}s"
+
+
+def mebibytes(b):
+    return f"{b / 2**20:.1f} MiB"
+
+
+def summarize(rows):
+    """Each tool's runs of one benchmark, as (tool, mean, stdev, peak memory, files, code), fastest first."""
+    by_tool = {}
+    for row in rows:
+        by_tool.setdefault(row["tool"], []).append(row)
+    results = []
+    for tool, runs in by_tool.items():
+        times = [float(r["value"]) for r in runs if r["kind"] == "time"]
+        # A single run has no deviation to report.
+        stdev = statistics.stdev(times) if len(times) > 1 else None
+        rss = statistics.median(int(r["value"]) for r in runs if r["kind"] == "memory")
+        results.append((tool, statistics.mean(times), stdev, rss, runs[0]["files"], runs[0]["code"]))
+    return sorted(results, key=lambda r: r[1])
+
+
+def number(n):
+    return f"{int(n):,}" if str(n).isdigit() else "?"
+
+
+def print_summary(bench, rows):
+    heading = f"{bench.name} ({bench.path})"
+    print(f"{heading}\n{'-' * len(heading)}")
+    results = summarize(rows)
+    width = max(len(r[0]) for r in results) + 1
+    for i, (tool, mean, stdev, rss, files, code) in enumerate(results):
+        star = "*" if i == 0 else " "
+        spread = f"+/- {stdev:.4f}" if stdev is not None else " " * 10
+        print(f"{tool + star:<{width}} {mean:8.4f} {spread}  {mebibytes(rss):>11}  "
+              f"(files: {number(files)}, code: {number(code)})")
+    print(flush=True)
+
+
+def print_markdown(raw):
+    rows = list(csv.DictReader(open(raw)))
+    names = list(dict.fromkeys(r["benchmark"] for r in rows))
+    by_name = {b.name: b for b in BENCHMARKS}
+    for name in names:
+        bench = by_name.get(name, Benchmark(name, name, name))
+        results = summarize([r for r in rows if r["benchmark"] == name])
+        fastest = results[0][1]
+        print(f"#### {bench.title}\n")
+        print("| Tool | Files | Code lines | Time | Memory |")
+        print("| ---- | ----: | ---------: | ---: | -----: |")
+        for i, (tool, mean, stdev, rss, files, code) in enumerate(results):
+            time_ = seconds(mean) if stdev is None else f"{seconds(mean)} ± {seconds(stdev)}"
+            if i == 0:
+                time_ = f"**{time_}**"
+            print(f"| {LINKS.get(tool, tool)} | {number(files)} | {number(code)} | {time_} ({mean / fastest:.2f}x) "
+                  f"| {mebibytes(rss)} |")
+        print()
+    print_geometric_means(rows, names, by_name)
+
+
+def print_geometric_means(rows, names, by_name):
+    """Print each tool's time and memory as multiples of ripcloc's, combined over the benchmarks by their geometric
+    mean, with the range of the multiples beside it."""
+    for equal, title in [(False, "default settings"), (True, "equal work")]:
+        ratios = {}
+        for name in names:
+            if by_name.get(name, Benchmark(name, name, name)).equal != equal:
+                continue
+            results = {r[0]: r for r in summarize([r for r in rows if r["benchmark"] == name])}
+            base = results.get("ripcloc")
+            if not base:
+                continue
+            for tool, (_, mean, _, rss, _, _) in results.items():
+                if tool != "ripcloc":
+                    ratios.setdefault(tool, []).append((mean / base[1], rss / base[3]))
+        if not ratios:
+            continue
+        print(f"#### Multiples of ripcloc, {title}\n")
+        print("| Tool | Benchmarks | Time | Time range | Memory | Memory range |")
+        print("| ---- | ---------: | ---: | ---------: | -----: | -----------: |")
+        for tool, pairs in ratios.items():
+            times, memories = zip(*pairs)
+            print(f"| {LINKS.get(tool, tool)} | {len(pairs)} | {statistics.geometric_mean(times):.2f}x "
+                  f"| {min(times):.2f}x–{max(times):.2f}x | {statistics.geometric_mean(memories):.2f}x "
+                  f"| {min(memories):.2f}x–{max(memories):.2f}x |")
+        print()
+
+
+def download(corpora):
+    corpora.mkdir(parents=True, exist_ok=True)
+
+    def clone(item):
+        name, (url, commit) = item
+        repo = corpora / name
+        if repo.exists():
+            return
+        repo.parent.mkdir(parents=True, exist_ok=True)
+        subprocess.run(["git", "init", "-q", repo], check=True)
+        subprocess.run(["git", "-C", repo, "fetch", "-q", "--depth", "1", url, commit], check=True)
+        subprocess.run(["git", "-C", repo, "checkout", "-q", "FETCH_HEAD"], check=True)
+        print(f"cloned {name}", file=sys.stderr)
+
+    with ThreadPoolExecutor(8) as pool:
+        list(pool.map(clone, CLONES.items()))
+
+    def fetch(url):
+        with urllib.request.urlopen(url) as response:
+            return response.read()
+
+    if not (corpora / "grep-3.12").exists():
+        tarfile.open(fileobj=io.BytesIO(fetch("https://ftp.gnu.org/gnu/grep/grep-3.12.tar.xz"))).extractall(
+            corpora, filter="data")
+    if not (corpora / "sqlite-amalgamation-3500400").exists():
+        zipfile.ZipFile(io.BytesIO(fetch("https://www.sqlite.org/2025/sqlite-amalgamation-3500400.zip"))).extractall(
+            corpora)
+    checker = corpora / "typescript-5.6.3" / "checker.ts"
+    if not checker.exists():
+        checker.parent.mkdir(exist_ok=True)
+        checker.write_bytes(
+            fetch("https://raw.githubusercontent.com/microsoft/TypeScript/v5.6.3/src/compiler/checker.ts"))
+
+    for name, (source, patterns) in COPIES.items():
+        to = corpora / name
+        if to.exists():
+            continue
+        for directory, subdirectories, files in os.walk(corpora / source):
+            subdirectories[:] = [d for d in subdirectories if d != ".git"]
+            for file in files:
+                if any(fnmatch.fnmatchcase(file, p) for p in patterns):
+                    path = Path(directory, file)
+                    target = to / path.relative_to(corpora / source)
+                    target.parent.mkdir(parents=True, exist_ok=True)
+                    shutil.copy2(path, target, follow_symlinks=False)
+        print(f"copied {name}", file=sys.stderr)
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    parser.add_argument("benchmarks", nargs="*", help="the benchmarks to run, by default every one")
+    parser.add_argument("--dir", type=Path, help="the directory of corpora")
+    parser.add_argument("--download", action="store_true", help="download the corpora into --dir and exit")
+    parser.add_argument("--raw", type=Path, help="write every recorded run to this CSV file")
+    parser.add_argument("--markdown", type=Path, metavar="RAW", help="print a raw CSV file as Markdown tables and exit")
+    parser.add_argument("--list", action="store_true", help="list the benchmarks and exit")
+    parser.add_argument("--ripcloc", default=str(ROOT / "target" / "release" / "ripcloc"))
+    parser.add_argument("--tools", default="ripcloc,ripcloc -c,tokei,scc,cloc", help="comma-separated, in order")
+    parser.add_argument("--cpus", default="1-15", help="the cores to pin to on Linux")
+    parser.add_argument("--warmup", type=int, default=3)
+    parser.add_argument("--rounds", type=int, default=10)
+    parser.add_argument("--cloc-rounds", type=int, default=1)
+    parser.add_argument("--memory-runs", type=int, default=3)
+    args = parser.parse_args()
+
+    if args.list:
+        for b in BENCHMARKS:
+            print(f"{b.name:14} {b.path}")
+        return
+    if args.markdown:
+        print_markdown(args.markdown)
+        return
+    if not args.dir:
+        parser.error("--dir is required")
+    corpora = args.dir.resolve()
+    if args.download:
+        download(corpora)
+        return
+
+    unknown = set(args.benchmarks) - {b.name for b in BENCHMARKS}
+    if unknown:
+        parser.error(f"unknown benchmarks: {', '.join(sorted(unknown))}")
+    selected = [b for b in BENCHMARKS if not args.benchmarks or b.name in args.benchmarks]
+    tools = [t.strip() for t in args.tools.split(",") if t.strip()]
+    ripcloc = str(Path(args.ripcloc).resolve())
+    if hasattr(os, "sched_setaffinity"):
+        cores = set()
+        for part in args.cpus.split(","):
+            low, _, high = part.partition("-")
+            cores.update(range(int(low), int(high or low) + 1))
+        os.sched_setaffinity(0, cores)
+
+    for line in environment(corpora, ripcloc, tools, args.cpus):
+        print(line)
+    print(flush=True)
+    # The raw file is opened before the move into the corpora, so that a relative path is from where the suite ran.
+    raw = open(args.raw, "w", newline="") if args.raw else None
+    os.chdir(corpora)
+    writer = None
+    for bench in selected:
+        print(f"running {bench.name}", file=sys.stderr)
+        rows = measure(
+            bench, commands(bench, ripcloc, tools), args.warmup, args.rounds, args.cloc_rounds, args.memory_runs
+        )
+        if raw:
+            writer = writer or csv.DictWriter(raw, fieldnames=list(rows[0]))
+            if raw.tell() == 0:
+                writer.writeheader()
+            writer.writerows(rows)
+            raw.flush()
+        print_summary(bench, rows)
+
+
+if __name__ == "__main__":
+    main()

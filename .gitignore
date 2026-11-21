@@ -3,3 +3,6 @@
 /target/
 /tests/fixtures/*/target/
 /tests/fixtures/*/Cargo.lock
+/bench/corpora/
+/bench/results/
+__pycache__/

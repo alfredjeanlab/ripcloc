@@ -1,0 +1,1420 @@
+benchmark,tool,command,kind,round,value,files,code
+large_c,ripcloc,sqlite-amalgamation-3500400/sqlite3.c,memory,0,13611008,1,165971
+large_c,ripcloc -c,-c sqlite-amalgamation-3500400/sqlite3.c,memory,0,13246464,1,165971
+large_c,tokei,sqlite-amalgamation-3500400/sqlite3.c,memory,0,15671296,1,171935
+large_c,scc,sqlite-amalgamation-3500400/sqlite3.c,memory,0,25874432,1,165971
+large_c,ripcloc,sqlite-amalgamation-3500400/sqlite3.c,memory,1,13713408,1,165971
+large_c,ripcloc -c,-c sqlite-amalgamation-3500400/sqlite3.c,memory,1,13246464,1,165971
+large_c,tokei,sqlite-amalgamation-3500400/sqlite3.c,memory,1,15880192,1,171935
+large_c,scc,sqlite-amalgamation-3500400/sqlite3.c,memory,1,26075136,1,165971
+large_c,ripcloc,sqlite-amalgamation-3500400/sqlite3.c,memory,2,13619200,1,165971
+large_c,ripcloc -c,-c sqlite-amalgamation-3500400/sqlite3.c,memory,2,13447168,1,165971
+large_c,tokei,sqlite-amalgamation-3500400/sqlite3.c,memory,2,15859712,1,171935
+large_c,scc,sqlite-amalgamation-3500400/sqlite3.c,memory,2,26705920,1,165971
+large_c,scc,sqlite-amalgamation-3500400/sqlite3.c,time,0,0.080467,1,165971
+large_c,ripcloc,sqlite-amalgamation-3500400/sqlite3.c,time,0,0.035658,1,165971
+large_c,ripcloc -c,-c sqlite-amalgamation-3500400/sqlite3.c,time,0,0.034952,1,165971
+large_c,tokei,sqlite-amalgamation-3500400/sqlite3.c,time,0,0.119997,1,171935
+large_c,ripcloc,sqlite-amalgamation-3500400/sqlite3.c,time,1,0.035504,1,165971
+large_c,ripcloc -c,-c sqlite-amalgamation-3500400/sqlite3.c,time,1,0.034562,1,165971
+large_c,tokei,sqlite-amalgamation-3500400/sqlite3.c,time,1,0.120619,1,171935
+large_c,scc,sqlite-amalgamation-3500400/sqlite3.c,time,1,0.090078,1,165971
+large_c,ripcloc -c,-c sqlite-amalgamation-3500400/sqlite3.c,time,2,0.014733,1,165971
+large_c,tokei,sqlite-amalgamation-3500400/sqlite3.c,time,2,0.091371,1,171935
+large_c,scc,sqlite-amalgamation-3500400/sqlite3.c,time,2,0.082688,1,165971
+large_c,ripcloc,sqlite-amalgamation-3500400/sqlite3.c,time,2,0.015201,1,165971
+large_c,tokei,sqlite-amalgamation-3500400/sqlite3.c,time,3,0.103989,1,171935
+large_c,scc,sqlite-amalgamation-3500400/sqlite3.c,time,3,0.082104,1,165971
+large_c,ripcloc,sqlite-amalgamation-3500400/sqlite3.c,time,3,0.015943,1,165971
+large_c,ripcloc -c,-c sqlite-amalgamation-3500400/sqlite3.c,time,3,0.036788,1,165971
+large_c,scc,sqlite-amalgamation-3500400/sqlite3.c,time,4,0.067218,1,165971
+large_c,ripcloc,sqlite-amalgamation-3500400/sqlite3.c,time,4,0.036077,1,165971
+large_c,ripcloc -c,-c sqlite-amalgamation-3500400/sqlite3.c,time,4,0.035403,1,165971
+large_c,tokei,sqlite-amalgamation-3500400/sqlite3.c,time,4,0.113903,1,171935
+large_c,ripcloc,sqlite-amalgamation-3500400/sqlite3.c,time,5,0.035694,1,165971
+large_c,ripcloc -c,-c sqlite-amalgamation-3500400/sqlite3.c,time,5,0.015173,1,165971
+large_c,tokei,sqlite-amalgamation-3500400/sqlite3.c,time,5,0.118127,1,171935
+large_c,scc,sqlite-amalgamation-3500400/sqlite3.c,time,5,0.083041,1,165971
+large_c,ripcloc -c,-c sqlite-amalgamation-3500400/sqlite3.c,time,6,0.034941,1,165971
+large_c,tokei,sqlite-amalgamation-3500400/sqlite3.c,time,6,0.106974,1,171935
+large_c,scc,sqlite-amalgamation-3500400/sqlite3.c,time,6,0.085541,1,165971
+large_c,ripcloc,sqlite-amalgamation-3500400/sqlite3.c,time,6,0.035835,1,165971
+large_c,tokei,sqlite-amalgamation-3500400/sqlite3.c,time,7,0.115007,1,171935
+large_c,scc,sqlite-amalgamation-3500400/sqlite3.c,time,7,0.073955,1,165971
+large_c,ripcloc,sqlite-amalgamation-3500400/sqlite3.c,time,7,0.033800,1,165971
+large_c,ripcloc -c,-c sqlite-amalgamation-3500400/sqlite3.c,time,7,0.034905,1,165971
+large_c,scc,sqlite-amalgamation-3500400/sqlite3.c,time,8,0.072915,1,165971
+large_c,ripcloc,sqlite-amalgamation-3500400/sqlite3.c,time,8,0.036510,1,165971
+large_c,ripcloc -c,-c sqlite-amalgamation-3500400/sqlite3.c,time,8,0.029682,1,165971
+large_c,tokei,sqlite-amalgamation-3500400/sqlite3.c,time,8,0.119366,1,171935
+large_c,ripcloc,sqlite-amalgamation-3500400/sqlite3.c,time,9,0.036031,1,165971
+large_c,ripcloc -c,-c sqlite-amalgamation-3500400/sqlite3.c,time,9,0.035001,1,165971
+large_c,tokei,sqlite-amalgamation-3500400/sqlite3.c,time,9,0.123161,1,171935
+large_c,scc,sqlite-amalgamation-3500400/sqlite3.c,time,9,0.083401,1,165971
+large_c,cloc,sqlite-amalgamation-3500400/sqlite3.c,memory,0,201388032,1,165961
+large_c,cloc,sqlite-amalgamation-3500400/sqlite3.c,time,0,0.824030,1,165961
+large_rust,ripcloc,rust/library/stdarch/crates/core_arch/src/x86/avx512f.rs,memory,0,7938048,1,48200
+large_rust,ripcloc -c,-c rust/library/stdarch/crates/core_arch/src/x86/avx512f.rs,memory,0,6815744,1,48200
+large_rust,tokei,rust/library/stdarch/crates/core_arch/src/x86/avx512f.rs,memory,0,10698752,1,48200
+large_rust,scc,rust/library/stdarch/crates/core_arch/src/x86/avx512f.rs,memory,0,19877888,1,48200
+large_rust,ripcloc,rust/library/stdarch/crates/core_arch/src/x86/avx512f.rs,memory,1,8073216,1,48200
+large_rust,ripcloc -c,-c rust/library/stdarch/crates/core_arch/src/x86/avx512f.rs,memory,1,6836224,1,48200
+large_rust,tokei,rust/library/stdarch/crates/core_arch/src/x86/avx512f.rs,memory,1,10747904,1,48200
+large_rust,scc,rust/library/stdarch/crates/core_arch/src/x86/avx512f.rs,memory,1,20340736,1,48200
+large_rust,ripcloc,rust/library/stdarch/crates/core_arch/src/x86/avx512f.rs,memory,2,7983104,1,48200
+large_rust,ripcloc -c,-c rust/library/stdarch/crates/core_arch/src/x86/avx512f.rs,memory,2,6803456,1,48200
+large_rust,tokei,rust/library/stdarch/crates/core_arch/src/x86/avx512f.rs,memory,2,10625024,1,48200
+large_rust,scc,rust/library/stdarch/crates/core_arch/src/x86/avx512f.rs,memory,2,20766720,1,48200
+large_rust,scc,rust/library/stdarch/crates/core_arch/src/x86/avx512f.rs,time,0,0.053752,1,48200
+large_rust,ripcloc,rust/library/stdarch/crates/core_arch/src/x86/avx512f.rs,time,0,0.014445,1,48200
+large_rust,ripcloc -c,-c rust/library/stdarch/crates/core_arch/src/x86/avx512f.rs,time,0,0.010930,1,48200
+large_rust,tokei,rust/library/stdarch/crates/core_arch/src/x86/avx512f.rs,time,0,0.046851,1,48200
+large_rust,ripcloc,rust/library/stdarch/crates/core_arch/src/x86/avx512f.rs,time,1,0.011775,1,48200
+large_rust,ripcloc -c,-c rust/library/stdarch/crates/core_arch/src/x86/avx512f.rs,time,1,0.010737,1,48200
+large_rust,tokei,rust/library/stdarch/crates/core_arch/src/x86/avx512f.rs,time,1,0.043713,1,48200
+large_rust,scc,rust/library/stdarch/crates/core_arch/src/x86/avx512f.rs,time,1,0.021807,1,48200
+large_rust,ripcloc -c,-c rust/library/stdarch/crates/core_arch/src/x86/avx512f.rs,time,2,0.010901,1,48200
+large_rust,tokei,rust/library/stdarch/crates/core_arch/src/x86/avx512f.rs,time,2,0.047635,1,48200
+large_rust,scc,rust/library/stdarch/crates/core_arch/src/x86/avx512f.rs,time,2,0.042437,1,48200
+large_rust,ripcloc,rust/library/stdarch/crates/core_arch/src/x86/avx512f.rs,time,2,0.014232,1,48200
+large_rust,tokei,rust/library/stdarch/crates/core_arch/src/x86/avx512f.rs,time,3,0.046024,1,48200
+large_rust,scc,rust/library/stdarch/crates/core_arch/src/x86/avx512f.rs,time,3,0.051913,1,48200
+large_rust,ripcloc,rust/library/stdarch/crates/core_arch/src/x86/avx512f.rs,time,3,0.014485,1,48200
+large_rust,ripcloc -c,-c rust/library/stdarch/crates/core_arch/src/x86/avx512f.rs,time,3,0.010617,1,48200
+large_rust,scc,rust/library/stdarch/crates/core_arch/src/x86/avx512f.rs,time,4,0.054738,1,48200
+large_rust,ripcloc,rust/library/stdarch/crates/core_arch/src/x86/avx512f.rs,time,4,0.014065,1,48200
+large_rust,ripcloc -c,-c rust/library/stdarch/crates/core_arch/src/x86/avx512f.rs,time,4,0.010996,1,48200
+large_rust,tokei,rust/library/stdarch/crates/core_arch/src/x86/avx512f.rs,time,4,0.046491,1,48200
+large_rust,ripcloc,rust/library/stdarch/crates/core_arch/src/x86/avx512f.rs,time,5,0.014366,1,48200
+large_rust,ripcloc -c,-c rust/library/stdarch/crates/core_arch/src/x86/avx512f.rs,time,5,0.010562,1,48200
+large_rust,tokei,rust/library/stdarch/crates/core_arch/src/x86/avx512f.rs,time,5,0.037813,1,48200
+large_rust,scc,rust/library/stdarch/crates/core_arch/src/x86/avx512f.rs,time,5,0.047908,1,48200
+large_rust,ripcloc -c,-c rust/library/stdarch/crates/core_arch/src/x86/avx512f.rs,time,6,0.010852,1,48200
+large_rust,tokei,rust/library/stdarch/crates/core_arch/src/x86/avx512f.rs,time,6,0.047923,1,48200
+large_rust,scc,rust/library/stdarch/crates/core_arch/src/x86/avx512f.rs,time,6,0.046551,1,48200
+large_rust,ripcloc,rust/library/stdarch/crates/core_arch/src/x86/avx512f.rs,time,6,0.012209,1,48200
+large_rust,tokei,rust/library/stdarch/crates/core_arch/src/x86/avx512f.rs,time,7,0.042858,1,48200
+large_rust,scc,rust/library/stdarch/crates/core_arch/src/x86/avx512f.rs,time,7,0.051750,1,48200
+large_rust,ripcloc,rust/library/stdarch/crates/core_arch/src/x86/avx512f.rs,time,7,0.014036,1,48200
+large_rust,ripcloc -c,-c rust/library/stdarch/crates/core_arch/src/x86/avx512f.rs,time,7,0.010826,1,48200
+large_rust,scc,rust/library/stdarch/crates/core_arch/src/x86/avx512f.rs,time,8,0.049083,1,48200
+large_rust,ripcloc,rust/library/stdarch/crates/core_arch/src/x86/avx512f.rs,time,8,0.014173,1,48200
+large_rust,ripcloc -c,-c rust/library/stdarch/crates/core_arch/src/x86/avx512f.rs,time,8,0.011329,1,48200
+large_rust,tokei,rust/library/stdarch/crates/core_arch/src/x86/avx512f.rs,time,8,0.047491,1,48200
+large_rust,ripcloc,rust/library/stdarch/crates/core_arch/src/x86/avx512f.rs,time,9,0.014186,1,48200
+large_rust,ripcloc -c,-c rust/library/stdarch/crates/core_arch/src/x86/avx512f.rs,time,9,0.010475,1,48200
+large_rust,tokei,rust/library/stdarch/crates/core_arch/src/x86/avx512f.rs,time,9,0.048700,1,48200
+large_rust,scc,rust/library/stdarch/crates/core_arch/src/x86/avx512f.rs,time,9,0.051714,1,48200
+large_rust,cloc,rust/library/stdarch/crates/core_arch/src/x86/avx512f.rs,memory,0,73572352,1,48200
+large_rust,cloc,rust/library/stdarch/crates/core_arch/src/x86/avx512f.rs,time,0,0.267511,1,48200
+large_ts,ripcloc,typescript-5.6.3/checker.ts,memory,0,7471104,1,42977
+large_ts,ripcloc -c,-c typescript-5.6.3/checker.ts,memory,0,6844416,1,42977
+large_ts,tokei,typescript-5.6.3/checker.ts,memory,0,10506240,1,42977
+large_ts,scc,typescript-5.6.3/checker.ts,memory,0,21946368,1,42977
+large_ts,ripcloc,typescript-5.6.3/checker.ts,memory,1,7548928,1,42977
+large_ts,ripcloc -c,-c typescript-5.6.3/checker.ts,memory,1,6885376,1,42977
+large_ts,tokei,typescript-5.6.3/checker.ts,memory,1,10625024,1,42977
+large_ts,scc,typescript-5.6.3/checker.ts,memory,1,19746816,1,42977
+large_ts,ripcloc,typescript-5.6.3/checker.ts,memory,2,7462912,1,42977
+large_ts,ripcloc -c,-c typescript-5.6.3/checker.ts,memory,2,6893568,1,42977
+large_ts,tokei,typescript-5.6.3/checker.ts,memory,2,10391552,1,42977
+large_ts,scc,typescript-5.6.3/checker.ts,memory,2,19742720,1,42977
+large_ts,scc,typescript-5.6.3/checker.ts,time,0,0.044305,1,42977
+large_ts,ripcloc,typescript-5.6.3/checker.ts,time,0,0.011953,1,42977
+large_ts,ripcloc -c,-c typescript-5.6.3/checker.ts,time,0,0.011025,1,42977
+large_ts,tokei,typescript-5.6.3/checker.ts,time,0,0.036297,1,42977
+large_ts,ripcloc,typescript-5.6.3/checker.ts,time,1,0.011985,1,42977
+large_ts,ripcloc -c,-c typescript-5.6.3/checker.ts,time,1,0.011238,1,42977
+large_ts,tokei,typescript-5.6.3/checker.ts,time,1,0.036625,1,42977
+large_ts,scc,typescript-5.6.3/checker.ts,time,1,0.045672,1,42977
+large_ts,ripcloc -c,-c typescript-5.6.3/checker.ts,time,2,0.010986,1,42977
+large_ts,tokei,typescript-5.6.3/checker.ts,time,2,0.037039,1,42977
+large_ts,scc,typescript-5.6.3/checker.ts,time,2,0.062164,1,42977
+large_ts,ripcloc,typescript-5.6.3/checker.ts,time,2,0.012109,1,42977
+large_ts,tokei,typescript-5.6.3/checker.ts,time,3,0.038475,1,42977
+large_ts,scc,typescript-5.6.3/checker.ts,time,3,0.053294,1,42977
+large_ts,ripcloc,typescript-5.6.3/checker.ts,time,3,0.012214,1,42977
+large_ts,ripcloc -c,-c typescript-5.6.3/checker.ts,time,3,0.011418,1,42977
+large_ts,scc,typescript-5.6.3/checker.ts,time,4,0.037499,1,42977
+large_ts,ripcloc,typescript-5.6.3/checker.ts,time,4,0.011827,1,42977
+large_ts,ripcloc -c,-c typescript-5.6.3/checker.ts,time,4,0.011179,1,42977
+large_ts,tokei,typescript-5.6.3/checker.ts,time,4,0.035316,1,42977
+large_ts,ripcloc,typescript-5.6.3/checker.ts,time,5,0.011863,1,42977
+large_ts,ripcloc -c,-c typescript-5.6.3/checker.ts,time,5,0.011408,1,42977
+large_ts,tokei,typescript-5.6.3/checker.ts,time,5,0.037146,1,42977
+large_ts,scc,typescript-5.6.3/checker.ts,time,5,0.051639,1,42977
+large_ts,ripcloc -c,-c typescript-5.6.3/checker.ts,time,6,0.011588,1,42977
+large_ts,tokei,typescript-5.6.3/checker.ts,time,6,0.036656,1,42977
+large_ts,scc,typescript-5.6.3/checker.ts,time,6,0.051667,1,42977
+large_ts,ripcloc,typescript-5.6.3/checker.ts,time,6,0.011969,1,42977
+large_ts,tokei,typescript-5.6.3/checker.ts,time,7,0.036688,1,42977
+large_ts,scc,typescript-5.6.3/checker.ts,time,7,0.052437,1,42977
+large_ts,ripcloc,typescript-5.6.3/checker.ts,time,7,0.011906,1,42977
+large_ts,ripcloc -c,-c typescript-5.6.3/checker.ts,time,7,0.010785,1,42977
+large_ts,scc,typescript-5.6.3/checker.ts,time,8,0.050768,1,42977
+large_ts,ripcloc,typescript-5.6.3/checker.ts,time,8,0.011766,1,42977
+large_ts,ripcloc -c,-c typescript-5.6.3/checker.ts,time,8,0.010941,1,42977
+large_ts,tokei,typescript-5.6.3/checker.ts,time,8,0.036738,1,42977
+large_ts,ripcloc,typescript-5.6.3/checker.ts,time,9,0.011830,1,42977
+large_ts,ripcloc -c,-c typescript-5.6.3/checker.ts,time,9,0.010695,1,42977
+large_ts,tokei,typescript-5.6.3/checker.ts,time,9,0.040166,1,42977
+large_ts,scc,typescript-5.6.3/checker.ts,time,9,0.057069,1,42977
+large_ts,cloc,typescript-5.6.3/checker.ts,memory,0,69201920,1,42977
+large_ts,cloc,typescript-5.6.3/checker.ts,time,0,0.290338,1,42977
+small_file,ripcloc,ripgrep/crates/core/main.rs,memory,0,4382720,1,335
+small_file,ripcloc -c,-c ripgrep/crates/core/main.rs,memory,0,3936256,1,335
+small_file,tokei,ripgrep/crates/core/main.rs,memory,0,5402624,1,335
+small_file,scc,ripgrep/crates/core/main.rs,memory,0,16551936,1,335
+small_file,ripcloc,ripgrep/crates/core/main.rs,memory,1,4308992,1,335
+small_file,ripcloc -c,-c ripgrep/crates/core/main.rs,memory,1,4018176,1,335
+small_file,tokei,ripgrep/crates/core/main.rs,memory,1,5251072,1,335
+small_file,scc,ripgrep/crates/core/main.rs,memory,1,17391616,1,335
+small_file,ripcloc,ripgrep/crates/core/main.rs,memory,2,4382720,1,335
+small_file,ripcloc -c,-c ripgrep/crates/core/main.rs,memory,2,3948544,1,335
+small_file,tokei,ripgrep/crates/core/main.rs,memory,2,5431296,1,335
+small_file,scc,ripgrep/crates/core/main.rs,memory,2,16994304,1,335
+small_file,scc,ripgrep/crates/core/main.rs,time,0,0.022170,1,335
+small_file,ripcloc,ripgrep/crates/core/main.rs,time,0,0.003359,1,335
+small_file,ripcloc -c,-c ripgrep/crates/core/main.rs,time,0,0.001994,1,335
+small_file,tokei,ripgrep/crates/core/main.rs,time,0,0.006452,1,335
+small_file,ripcloc,ripgrep/crates/core/main.rs,time,1,0.003518,1,335
+small_file,ripcloc -c,-c ripgrep/crates/core/main.rs,time,1,0.002473,1,335
+small_file,tokei,ripgrep/crates/core/main.rs,time,1,0.005799,1,335
+small_file,scc,ripgrep/crates/core/main.rs,time,1,0.020193,1,335
+small_file,ripcloc -c,-c ripgrep/crates/core/main.rs,time,2,0.002146,1,335
+small_file,tokei,ripgrep/crates/core/main.rs,time,2,0.007745,1,335
+small_file,scc,ripgrep/crates/core/main.rs,time,2,0.015819,1,335
+small_file,ripcloc,ripgrep/crates/core/main.rs,time,2,0.003545,1,335
+small_file,tokei,ripgrep/crates/core/main.rs,time,3,0.007000,1,335
+small_file,scc,ripgrep/crates/core/main.rs,time,3,0.023734,1,335
+small_file,ripcloc,ripgrep/crates/core/main.rs,time,3,0.003584,1,335
+small_file,ripcloc -c,-c ripgrep/crates/core/main.rs,time,3,0.002676,1,335
+small_file,scc,ripgrep/crates/core/main.rs,time,4,0.019978,1,335
+small_file,ripcloc,ripgrep/crates/core/main.rs,time,4,0.003281,1,335
+small_file,ripcloc -c,-c ripgrep/crates/core/main.rs,time,4,0.002148,1,335
+small_file,tokei,ripgrep/crates/core/main.rs,time,4,0.008646,1,335
+small_file,ripcloc,ripgrep/crates/core/main.rs,time,5,0.003231,1,335
+small_file,ripcloc -c,-c ripgrep/crates/core/main.rs,time,5,0.003875,1,335
+small_file,tokei,ripgrep/crates/core/main.rs,time,5,0.009320,1,335
+small_file,scc,ripgrep/crates/core/main.rs,time,5,0.020030,1,335
+small_file,ripcloc -c,-c ripgrep/crates/core/main.rs,time,6,0.002602,1,335
+small_file,tokei,ripgrep/crates/core/main.rs,time,6,0.009681,1,335
+small_file,scc,ripgrep/crates/core/main.rs,time,6,0.019675,1,335
+small_file,ripcloc,ripgrep/crates/core/main.rs,time,6,0.002058,1,335
+small_file,tokei,ripgrep/crates/core/main.rs,time,7,0.006918,1,335
+small_file,scc,ripgrep/crates/core/main.rs,time,7,0.023637,1,335
+small_file,ripcloc,ripgrep/crates/core/main.rs,time,7,0.001485,1,335
+small_file,ripcloc -c,-c ripgrep/crates/core/main.rs,time,7,0.002395,1,335
+small_file,scc,ripgrep/crates/core/main.rs,time,8,0.018354,1,335
+small_file,ripcloc,ripgrep/crates/core/main.rs,time,8,0.003348,1,335
+small_file,ripcloc -c,-c ripgrep/crates/core/main.rs,time,8,0.002455,1,335
+small_file,tokei,ripgrep/crates/core/main.rs,time,8,0.006560,1,335
+small_file,ripcloc,ripgrep/crates/core/main.rs,time,9,0.001438,1,335
+small_file,ripcloc -c,-c ripgrep/crates/core/main.rs,time,9,0.002518,1,335
+small_file,tokei,ripgrep/crates/core/main.rs,time,9,0.006414,1,335
+small_file,scc,ripgrep/crates/core/main.rs,time,9,0.008944,1,335
+small_file,cloc,ripgrep/crates/core/main.rs,memory,0,24395776,1,335
+small_file,cloc,ripgrep/crates/core/main.rs,time,0,0.117510,1,335
+ripcloc,ripcloc,ripcloc,memory,0,4870144,23,2823
+ripcloc,ripcloc -c,-c ripcloc,memory,0,4534272,23,2823
+ripcloc,tokei,ripcloc,memory,0,6197248,23,2869
+ripcloc,scc,ripcloc,memory,0,21274624,26,2925
+ripcloc,ripcloc,ripcloc,memory,1,4587520,23,2823
+ripcloc,ripcloc -c,-c ripcloc,memory,1,4595712,23,2823
+ripcloc,tokei,ripcloc,memory,1,6189056,23,2869
+ripcloc,scc,ripcloc,memory,1,21331968,26,2925
+ripcloc,ripcloc,ripcloc,memory,2,4399104,23,2823
+ripcloc,ripcloc -c,-c ripcloc,memory,2,4640768,23,2823
+ripcloc,tokei,ripcloc,memory,2,6258688,23,2869
+ripcloc,scc,ripcloc,memory,2,22130688,26,2925
+ripcloc,scc,ripcloc,time,0,0.028579,26,2925
+ripcloc,ripcloc,ripcloc,time,0,0.007216,23,2823
+ripcloc,ripcloc -c,-c ripcloc,time,0,0.006299,23,2823
+ripcloc,tokei,ripcloc,time,0,0.010017,23,2869
+ripcloc,ripcloc,ripcloc,time,1,0.007017,23,2823
+ripcloc,ripcloc -c,-c ripcloc,time,1,0.007082,23,2823
+ripcloc,tokei,ripcloc,time,1,0.010589,23,2869
+ripcloc,scc,ripcloc,time,1,0.032342,26,2925
+ripcloc,ripcloc -c,-c ripcloc,time,2,0.008756,23,2823
+ripcloc,tokei,ripcloc,time,2,0.009700,23,2869
+ripcloc,scc,ripcloc,time,2,0.029930,26,2925
+ripcloc,ripcloc,ripcloc,time,2,0.007252,23,2823
+ripcloc,tokei,ripcloc,time,3,0.010343,23,2869
+ripcloc,scc,ripcloc,time,3,0.023806,26,2925
+ripcloc,ripcloc,ripcloc,time,3,0.006097,23,2823
+ripcloc,ripcloc -c,-c ripcloc,time,3,0.006181,23,2823
+ripcloc,scc,ripcloc,time,4,0.023361,26,2925
+ripcloc,ripcloc,ripcloc,time,4,0.006120,23,2823
+ripcloc,ripcloc -c,-c ripcloc,time,4,0.006214,23,2823
+ripcloc,tokei,ripcloc,time,4,0.009522,23,2869
+ripcloc,ripcloc,ripcloc,time,5,0.006319,23,2823
+ripcloc,ripcloc -c,-c ripcloc,time,5,0.006336,23,2823
+ripcloc,tokei,ripcloc,time,5,0.009628,23,2869
+ripcloc,scc,ripcloc,time,5,0.026519,26,2925
+ripcloc,ripcloc -c,-c ripcloc,time,6,0.006259,23,2823
+ripcloc,tokei,ripcloc,time,6,0.009379,23,2869
+ripcloc,scc,ripcloc,time,6,0.026646,26,2925
+ripcloc,ripcloc,ripcloc,time,6,0.006462,23,2823
+ripcloc,tokei,ripcloc,time,7,0.009533,23,2869
+ripcloc,scc,ripcloc,time,7,0.027092,26,2925
+ripcloc,ripcloc,ripcloc,time,7,0.007651,23,2823
+ripcloc,ripcloc -c,-c ripcloc,time,7,0.006147,23,2823
+ripcloc,scc,ripcloc,time,8,0.023287,26,2925
+ripcloc,ripcloc,ripcloc,time,8,0.007059,23,2823
+ripcloc,ripcloc -c,-c ripcloc,time,8,0.005909,23,2823
+ripcloc,tokei,ripcloc,time,8,0.009603,23,2869
+ripcloc,ripcloc,ripcloc,time,9,0.006251,23,2823
+ripcloc,ripcloc -c,-c ripcloc,time,9,0.005908,23,2823
+ripcloc,tokei,ripcloc,time,9,0.009565,23,2869
+ripcloc,scc,ripcloc,time,9,0.028220,26,2925
+ripcloc,cloc,ripcloc,memory,0,24584192,25,2835
+ripcloc,cloc,ripcloc,time,0,1.063104,25,2835
+cloc,ripcloc,cloc,memory,0,7524352,701,57397
+cloc,ripcloc -c,-c cloc,memory,0,6688768,701,57397
+cloc,tokei,cloc,memory,0,8687616,885,26302
+cloc,scc,cloc,memory,0,73412608,894,64359
+cloc,ripcloc,cloc,memory,1,6926336,701,57397
+cloc,ripcloc -c,-c cloc,memory,1,6811648,701,57397
+cloc,tokei,cloc,memory,1,9310208,885,26302
+cloc,scc,cloc,memory,1,73666560,894,64359
+cloc,ripcloc,cloc,memory,2,7200768,701,57397
+cloc,ripcloc -c,-c cloc,memory,2,6946816,701,57397
+cloc,tokei,cloc,memory,2,8781824,885,26302
+cloc,scc,cloc,memory,2,74248192,894,64359
+cloc,scc,cloc,time,0,0.098312,894,64359
+cloc,ripcloc,cloc,time,0,0.013112,701,57397
+cloc,ripcloc -c,-c cloc,time,0,0.012766,701,57397
+cloc,tokei,cloc,time,0,0.023429,885,26302
+cloc,ripcloc,cloc,time,1,0.012654,701,57397
+cloc,ripcloc -c,-c cloc,time,1,0.012317,701,57397
+cloc,tokei,cloc,time,1,0.021580,885,26302
+cloc,scc,cloc,time,1,0.091699,894,64359
+cloc,ripcloc -c,-c cloc,time,2,0.011795,701,57397
+cloc,tokei,cloc,time,2,0.019248,885,26302
+cloc,scc,cloc,time,2,0.078766,894,64359
+cloc,ripcloc,cloc,time,2,0.010644,701,57397
+cloc,tokei,cloc,time,3,0.019801,885,26302
+cloc,scc,cloc,time,3,0.096939,894,64359
+cloc,ripcloc,cloc,time,3,0.012307,701,57397
+cloc,ripcloc -c,-c cloc,time,3,0.011794,701,57397
+cloc,scc,cloc,time,4,0.095187,894,64359
+cloc,ripcloc,cloc,time,4,0.010874,701,57397
+cloc,ripcloc -c,-c cloc,time,4,0.009156,701,57397
+cloc,tokei,cloc,time,4,0.013615,885,26302
+cloc,ripcloc,cloc,time,5,0.009515,701,57397
+cloc,ripcloc -c,-c cloc,time,5,0.010008,701,57397
+cloc,tokei,cloc,time,5,0.019283,885,26302
+cloc,scc,cloc,time,5,0.065506,894,64359
+cloc,ripcloc -c,-c cloc,time,6,0.010513,701,57397
+cloc,tokei,cloc,time,6,0.017921,885,26302
+cloc,scc,cloc,time,6,0.064657,894,64359
+cloc,ripcloc,cloc,time,6,0.010188,701,57397
+cloc,tokei,cloc,time,7,0.018125,885,26302
+cloc,scc,cloc,time,7,0.075606,894,64359
+cloc,ripcloc,cloc,time,7,0.009271,701,57397
+cloc,ripcloc -c,-c cloc,time,7,0.009047,701,57397
+cloc,scc,cloc,time,8,0.078023,894,64359
+cloc,ripcloc,cloc,time,8,0.011342,701,57397
+cloc,ripcloc -c,-c cloc,time,8,0.011049,701,57397
+cloc,tokei,cloc,time,8,0.018612,885,26302
+cloc,ripcloc,cloc,time,9,0.011401,701,57397
+cloc,ripcloc -c,-c cloc,time,9,0.010167,701,57397
+cloc,tokei,cloc,time,9,0.018047,885,26302
+cloc,scc,cloc,time,9,0.083621,894,64359
+cloc,cloc,cloc,memory,0,35659776,951,65969
+cloc,cloc,cloc,time,0,6.491000,951,65969
+grep,ripcloc,grep-3.12,memory,0,8314880,1371,217643
+grep,ripcloc -c,-c grep-3.12,memory,0,7786496,1371,217643
+grep,tokei,grep-3.12,memory,0,10391552,1382,230508
+grep,scc,grep-3.12,memory,0,37990400,1382,261404
+grep,ripcloc,grep-3.12,memory,1,8441856,1371,217643
+grep,ripcloc -c,-c grep-3.12,memory,1,7933952,1371,217643
+grep,tokei,grep-3.12,memory,1,9965568,1382,230508
+grep,scc,grep-3.12,memory,1,37261312,1382,261404
+grep,ripcloc,grep-3.12,memory,2,8146944,1371,217643
+grep,ripcloc -c,-c grep-3.12,memory,2,7749632,1371,217643
+grep,tokei,grep-3.12,memory,2,11141120,1382,230508
+grep,scc,grep-3.12,memory,2,32354304,1382,261404
+grep,scc,grep-3.12,time,0,0.026678,1382,261404
+grep,ripcloc,grep-3.12,time,0,0.008424,1371,217643
+grep,ripcloc -c,-c grep-3.12,time,0,0.008151,1371,217643
+grep,tokei,grep-3.12,time,0,0.026084,1382,230508
+grep,ripcloc,grep-3.12,time,1,0.010168,1371,217643
+grep,ripcloc -c,-c grep-3.12,time,1,0.008344,1371,217643
+grep,tokei,grep-3.12,time,1,0.020939,1382,230508
+grep,scc,grep-3.12,time,1,0.029496,1382,261404
+grep,ripcloc -c,-c grep-3.12,time,2,0.009645,1371,217643
+grep,tokei,grep-3.12,time,2,0.023677,1382,230508
+grep,scc,grep-3.12,time,2,0.025977,1382,261404
+grep,ripcloc,grep-3.12,time,2,0.007999,1371,217643
+grep,tokei,grep-3.12,time,3,0.020745,1382,230508
+grep,scc,grep-3.12,time,3,0.022090,1382,261404
+grep,ripcloc,grep-3.12,time,3,0.009731,1371,217643
+grep,ripcloc -c,-c grep-3.12,time,3,0.008930,1371,217643
+grep,scc,grep-3.12,time,4,0.037379,1382,261404
+grep,ripcloc,grep-3.12,time,4,0.008743,1371,217643
+grep,ripcloc -c,-c grep-3.12,time,4,0.007770,1371,217643
+grep,tokei,grep-3.12,time,4,0.017740,1382,230508
+grep,ripcloc,grep-3.12,time,5,0.007660,1371,217643
+grep,ripcloc -c,-c grep-3.12,time,5,0.008471,1371,217643
+grep,tokei,grep-3.12,time,5,0.021629,1382,230508
+grep,scc,grep-3.12,time,5,0.030217,1382,261404
+grep,ripcloc -c,-c grep-3.12,time,6,0.007671,1371,217643
+grep,tokei,grep-3.12,time,6,0.017636,1382,230508
+grep,scc,grep-3.12,time,6,0.021982,1382,261404
+grep,ripcloc,grep-3.12,time,6,0.007671,1371,217643
+grep,tokei,grep-3.12,time,7,0.017197,1382,230508
+grep,scc,grep-3.12,time,7,0.022237,1382,261404
+grep,ripcloc,grep-3.12,time,7,0.007471,1371,217643
+grep,ripcloc -c,-c grep-3.12,time,7,0.007066,1371,217643
+grep,scc,grep-3.12,time,8,0.025489,1382,261404
+grep,ripcloc,grep-3.12,time,8,0.008882,1371,217643
+grep,ripcloc -c,-c grep-3.12,time,8,0.007484,1371,217643
+grep,tokei,grep-3.12,time,8,0.017923,1382,230508
+grep,ripcloc,grep-3.12,time,9,0.007492,1371,217643
+grep,ripcloc -c,-c grep-3.12,time,9,0.006826,1371,217643
+grep,tokei,grep-3.12,time,9,0.017354,1382,230508
+grep,scc,grep-3.12,time,9,0.022168,1382,261404
+grep,cloc,grep-3.12,memory,0,51597312,1420,257611
+grep,cloc,grep-3.12,time,0,0.873921,1420,257611
+ripgrep,ripcloc,ripgrep,memory,0,6549504,154,46979
+ripgrep,ripcloc -c,-c ripgrep,memory,0,5521408,154,46979
+ripgrep,tokei,ripgrep,memory,0,8790016,154,43315
+ripgrep,scc,ripgrep,memory,0,25980928,193,54048
+ripgrep,ripcloc,ripgrep,memory,1,6287360,154,46979
+ripgrep,ripcloc -c,-c ripgrep,memory,1,5570560,154,46979
+ripgrep,tokei,ripgrep,memory,1,8359936,154,43315
+ripgrep,scc,ripgrep,memory,1,27508736,193,54048
+ripgrep,ripcloc,ripgrep,memory,2,6471680,154,46979
+ripgrep,ripcloc -c,-c ripgrep,memory,2,5824512,154,46979
+ripgrep,tokei,ripgrep,memory,2,8503296,154,43315
+ripgrep,scc,ripgrep,memory,2,28803072,193,54048
+ripgrep,scc,ripgrep,time,0,0.037859,193,54048
+ripgrep,ripcloc,ripgrep,time,0,0.011067,154,46979
+ripgrep,ripcloc -c,-c ripgrep,time,0,0.009582,154,46979
+ripgrep,tokei,ripgrep,time,0,0.020443,154,43315
+ripgrep,ripcloc,ripgrep,time,1,0.010071,154,46979
+ripgrep,ripcloc -c,-c ripgrep,time,1,0.009787,154,46979
+ripgrep,tokei,ripgrep,time,1,0.019591,154,43315
+ripgrep,scc,ripgrep,time,1,0.039005,193,54048
+ripgrep,ripcloc -c,-c ripgrep,time,2,0.010579,154,46979
+ripgrep,tokei,ripgrep,time,2,0.020280,154,43315
+ripgrep,scc,ripgrep,time,2,0.038940,193,54048
+ripgrep,ripcloc,ripgrep,time,2,0.010335,154,46979
+ripgrep,tokei,ripgrep,time,3,0.020603,154,43315
+ripgrep,scc,ripgrep,time,3,0.036833,193,54048
+ripgrep,ripcloc,ripgrep,time,3,0.012587,154,46979
+ripgrep,ripcloc -c,-c ripgrep,time,3,0.010093,154,46979
+ripgrep,scc,ripgrep,time,4,0.027892,193,54048
+ripgrep,ripcloc,ripgrep,time,4,0.009716,154,46979
+ripgrep,ripcloc -c,-c ripgrep,time,4,0.008470,154,46979
+ripgrep,tokei,ripgrep,time,4,0.017954,154,43315
+ripgrep,ripcloc,ripgrep,time,5,0.008771,154,46979
+ripgrep,ripcloc -c,-c ripgrep,time,5,0.007781,154,46979
+ripgrep,tokei,ripgrep,time,5,0.020039,154,43315
+ripgrep,scc,ripgrep,time,5,0.018286,193,54048
+ripgrep,ripcloc -c,-c ripgrep,time,6,0.007281,154,46979
+ripgrep,tokei,ripgrep,time,6,0.017825,154,43315
+ripgrep,scc,ripgrep,time,6,0.033614,193,54048
+ripgrep,ripcloc,ripgrep,time,6,0.009708,154,46979
+ripgrep,tokei,ripgrep,time,7,0.020013,154,43315
+ripgrep,scc,ripgrep,time,7,0.034571,193,54048
+ripgrep,ripcloc,ripgrep,time,7,0.010165,154,46979
+ripgrep,ripcloc -c,-c ripgrep,time,7,0.009522,154,46979
+ripgrep,scc,ripgrep,time,8,0.035035,193,54048
+ripgrep,ripcloc,ripgrep,time,8,0.009986,154,46979
+ripgrep,ripcloc -c,-c ripgrep,time,8,0.010096,154,46979
+ripgrep,tokei,ripgrep,time,8,0.022246,154,43315
+ripgrep,ripcloc,ripgrep,time,9,0.011397,154,46979
+ripgrep,ripcloc -c,-c ripgrep,time,9,0.011023,154,46979
+ripgrep,tokei,ripgrep,time,9,0.020197,154,43315
+ripgrep,scc,ripgrep,time,9,0.041250,193,54048
+ripgrep,cloc,ripgrep,memory,0,30109696,169,51383
+ripgrep,cloc,ripgrep,time,0,1.238910,169,51383
+react,ripcloc,react,memory,0,11616256,6963,831325
+react,ripcloc -c,-c react,memory,0,9625600,6963,831325
+react,tokei,react,memory,0,18878464,6988,778235
+react,scc,react,memory,0,50487296,7058,825668
+react,ripcloc,react,memory,1,11079680,6963,831325
+react,ripcloc -c,-c react,memory,1,10354688,6963,831325
+react,tokei,react,memory,1,19460096,6988,778235
+react,scc,react,memory,1,49442816,7058,825668
+react,ripcloc,react,memory,2,10719232,6963,831325
+react,ripcloc -c,-c react,memory,2,10702848,6963,831325
+react,tokei,react,memory,2,18526208,6988,778235
+react,scc,react,memory,2,52195328,7058,825668
+react,scc,react,time,0,0.049119,7058,825668
+react,ripcloc,react,time,0,0.021847,6963,831325
+react,ripcloc -c,-c react,time,0,0.021016,6963,831325
+react,tokei,react,time,0,0.055377,6988,778235
+react,ripcloc,react,time,1,0.020856,6963,831325
+react,ripcloc -c,-c react,time,1,0.021097,6963,831325
+react,tokei,react,time,1,0.053103,6988,778235
+react,scc,react,time,1,0.048596,7058,825668
+react,ripcloc -c,-c react,time,2,0.019453,6963,831325
+react,tokei,react,time,2,0.055358,6988,778235
+react,scc,react,time,2,0.052197,7058,825668
+react,ripcloc,react,time,2,0.022452,6963,831325
+react,tokei,react,time,3,0.054949,6988,778235
+react,scc,react,time,3,0.052114,7058,825668
+react,ripcloc,react,time,3,0.021938,6963,831325
+react,ripcloc -c,-c react,time,3,0.021603,6963,831325
+react,scc,react,time,4,0.052476,7058,825668
+react,ripcloc,react,time,4,0.022824,6963,831325
+react,ripcloc -c,-c react,time,4,0.019787,6963,831325
+react,tokei,react,time,4,0.053261,6988,778235
+react,ripcloc,react,time,5,0.021329,6963,831325
+react,ripcloc -c,-c react,time,5,0.018134,6963,831325
+react,tokei,react,time,5,0.054652,6988,778235
+react,scc,react,time,5,0.052390,7058,825668
+react,ripcloc -c,-c react,time,6,0.021827,6963,831325
+react,tokei,react,time,6,0.055107,6988,778235
+react,scc,react,time,6,0.051752,7058,825668
+react,ripcloc,react,time,6,0.021631,6963,831325
+react,tokei,react,time,7,0.054890,6988,778235
+react,scc,react,time,7,0.051081,7058,825668
+react,ripcloc,react,time,7,0.022240,6963,831325
+react,ripcloc -c,-c react,time,7,0.021275,6963,831325
+react,scc,react,time,8,0.050106,7058,825668
+react,ripcloc,react,time,8,0.021831,6963,831325
+react,ripcloc -c,-c react,time,8,0.023011,6963,831325
+react,tokei,react,time,8,0.053210,6988,778235
+react,ripcloc,react,time,9,0.023534,6963,831325
+react,ripcloc -c,-c react,time,9,0.022069,6963,831325
+react,tokei,react,time,9,0.054364,6988,778235
+react,scc,react,time,9,0.052117,7058,825668
+react,cloc,react,memory,0,42401792,6850,830227
+react,cloc,react,time,0,3.625825,6850,830227
+vue,ripcloc,vue,memory,0,6955008,627,158408
+vue,ripcloc -c,-c vue,memory,0,6021120,627,158408
+vue,tokei,vue,memory,0,9834496,628,154357
+vue,scc,vue,memory,0,30040064,659,155072
+vue,ripcloc,vue,memory,1,6877184,627,158408
+vue,ripcloc -c,-c vue,memory,1,6307840,627,158408
+vue,tokei,vue,memory,1,9728000,628,154357
+vue,scc,vue,memory,1,30040064,659,155072
+vue,ripcloc,vue,memory,2,6889472,627,158408
+vue,ripcloc -c,-c vue,memory,2,6180864,627,158408
+vue,tokei,vue,memory,2,9916416,628,154357
+vue,scc,vue,memory,2,28016640,659,155072
+vue,scc,vue,time,0,0.029442,659,155072
+vue,ripcloc,vue,time,0,0.008859,627,158408
+vue,ripcloc -c,-c vue,time,0,0.009859,627,158408
+vue,tokei,vue,time,0,0.021535,628,154357
+vue,ripcloc,vue,time,1,0.009318,627,158408
+vue,ripcloc -c,-c vue,time,1,0.008252,627,158408
+vue,tokei,vue,time,1,0.019422,628,154357
+vue,scc,vue,time,1,0.024459,659,155072
+vue,ripcloc -c,-c vue,time,2,0.008003,627,158408
+vue,tokei,vue,time,2,0.019341,628,154357
+vue,scc,vue,time,2,0.019241,659,155072
+vue,ripcloc,vue,time,2,0.010307,627,158408
+vue,tokei,vue,time,3,0.020287,628,154357
+vue,scc,vue,time,3,0.026084,659,155072
+vue,ripcloc,vue,time,3,0.010756,627,158408
+vue,ripcloc -c,-c vue,time,3,0.008935,627,158408
+vue,scc,vue,time,4,0.025008,659,155072
+vue,ripcloc,vue,time,4,0.009292,627,158408
+vue,ripcloc -c,-c vue,time,4,0.007580,627,158408
+vue,tokei,vue,time,4,0.016862,628,154357
+vue,ripcloc,vue,time,5,0.007401,627,158408
+vue,ripcloc -c,-c vue,time,5,0.008322,627,158408
+vue,tokei,vue,time,5,0.019052,628,154357
+vue,scc,vue,time,5,0.034613,659,155072
+vue,ripcloc -c,-c vue,time,6,0.007426,627,158408
+vue,tokei,vue,time,6,0.019516,628,154357
+vue,scc,vue,time,6,0.028752,659,155072
+vue,ripcloc,vue,time,6,0.009235,627,158408
+vue,tokei,vue,time,7,0.017608,628,154357
+vue,scc,vue,time,7,0.026950,659,155072
+vue,ripcloc,vue,time,7,0.007740,627,158408
+vue,ripcloc -c,-c vue,time,7,0.008027,627,158408
+vue,scc,vue,time,8,0.024999,659,155072
+vue,ripcloc,vue,time,8,0.008092,627,158408
+vue,ripcloc -c,-c vue,time,8,0.008284,627,158408
+vue,tokei,vue,time,8,0.018119,628,154357
+vue,ripcloc,vue,time,9,0.009922,627,158408
+vue,ripcloc -c,-c vue,time,9,0.006877,627,158408
+vue,tokei,vue,time,9,0.016524,628,154357
+vue,scc,vue,time,9,0.022412,659,155072
+vue,cloc,vue,memory,0,30199808,640,159168
+vue,cloc,vue,time,0,0.681607,640,159168
+element_plus,ripcloc,element-plus,memory,0,7331840,2302,224096
+element_plus,ripcloc -c,-c element-plus,memory,0,7090176,2302,224096
+element_plus,tokei,element-plus,memory,0,12742656,2311,210972
+element_plus,scc,element-plus,memory,0,31744000,2671,237583
+element_plus,ripcloc,element-plus,memory,1,7323648,2302,224096
+element_plus,ripcloc -c,-c element-plus,memory,1,6508544,2302,224096
+element_plus,tokei,element-plus,memory,1,12988416,2311,210972
+element_plus,scc,element-plus,memory,1,36868096,2671,237583
+element_plus,ripcloc,element-plus,memory,2,7200768,2302,224096
+element_plus,ripcloc -c,-c element-plus,memory,2,6422528,2302,224096
+element_plus,tokei,element-plus,memory,2,12861440,2311,210972
+element_plus,scc,element-plus,memory,2,30638080,2671,237583
+element_plus,scc,element-plus,time,0,0.032709,2671,237583
+element_plus,ripcloc,element-plus,time,0,0.011802,2302,224096
+element_plus,ripcloc -c,-c element-plus,time,0,0.010938,2302,224096
+element_plus,tokei,element-plus,time,0,0.034263,2311,210972
+element_plus,ripcloc,element-plus,time,1,0.011782,2302,224096
+element_plus,ripcloc -c,-c element-plus,time,1,0.010845,2302,224096
+element_plus,tokei,element-plus,time,1,0.031918,2311,210972
+element_plus,scc,element-plus,time,1,0.027487,2671,237583
+element_plus,ripcloc -c,-c element-plus,time,2,0.011100,2302,224096
+element_plus,tokei,element-plus,time,2,0.030188,2311,210972
+element_plus,scc,element-plus,time,2,0.023606,2671,237583
+element_plus,ripcloc,element-plus,time,2,0.012429,2302,224096
+element_plus,tokei,element-plus,time,3,0.030287,2311,210972
+element_plus,scc,element-plus,time,3,0.024808,2671,237583
+element_plus,ripcloc,element-plus,time,3,0.012144,2302,224096
+element_plus,ripcloc -c,-c element-plus,time,3,0.011173,2302,224096
+element_plus,scc,element-plus,time,4,0.032882,2671,237583
+element_plus,ripcloc,element-plus,time,4,0.012099,2302,224096
+element_plus,ripcloc -c,-c element-plus,time,4,0.011415,2302,224096
+element_plus,tokei,element-plus,time,4,0.031879,2311,210972
+element_plus,ripcloc,element-plus,time,5,0.012337,2302,224096
+element_plus,ripcloc -c,-c element-plus,time,5,0.011539,2302,224096
+element_plus,tokei,element-plus,time,5,0.031243,2311,210972
+element_plus,scc,element-plus,time,5,0.026114,2671,237583
+element_plus,ripcloc -c,-c element-plus,time,6,0.012067,2302,224096
+element_plus,tokei,element-plus,time,6,0.030724,2311,210972
+element_plus,scc,element-plus,time,6,0.020867,2671,237583
+element_plus,ripcloc,element-plus,time,6,0.012045,2302,224096
+element_plus,tokei,element-plus,time,7,0.028885,2311,210972
+element_plus,scc,element-plus,time,7,0.028246,2671,237583
+element_plus,ripcloc,element-plus,time,7,0.011473,2302,224096
+element_plus,ripcloc -c,-c element-plus,time,7,0.009746,2302,224096
+element_plus,scc,element-plus,time,8,0.030821,2671,237583
+element_plus,ripcloc,element-plus,time,8,0.012863,2302,224096
+element_plus,ripcloc -c,-c element-plus,time,8,0.011045,2302,224096
+element_plus,tokei,element-plus,time,8,0.029307,2311,210972
+element_plus,ripcloc,element-plus,time,9,0.011400,2302,224096
+element_plus,ripcloc -c,-c element-plus,time,9,0.010936,2302,224096
+element_plus,tokei,element-plus,time,9,0.028134,2311,210972
+element_plus,scc,element-plus,time,9,0.026300,2671,237583
+element_plus,cloc,element-plus,memory,0,33959936,2640,248665
+element_plus,cloc,element-plus,time,0,1.209135,2640,248665
+svelte,ripcloc,svelte,memory,0,9428992,9847,236406
+svelte,ripcloc -c,-c svelte,memory,0,7536640,9847,236406
+svelte,tokei,svelte,memory,0,24174592,9847,226285
+svelte,scc,svelte,memory,0,45596672,9884,236503
+svelte,ripcloc,svelte,memory,1,8323072,9847,236406
+svelte,ripcloc -c,-c svelte,memory,1,7544832,9847,236406
+svelte,tokei,svelte,memory,1,23212032,9847,226285
+svelte,scc,svelte,memory,1,46759936,9884,236503
+svelte,ripcloc,svelte,memory,2,8478720,9847,236406
+svelte,ripcloc -c,-c svelte,memory,2,7729152,9847,236406
+svelte,tokei,svelte,memory,2,23449600,9847,226285
+svelte,scc,svelte,memory,2,46686208,9884,236503
+svelte,scc,svelte,time,0,0.041009,9884,236503
+svelte,ripcloc,svelte,time,0,0.039367,9847,236406
+svelte,ripcloc -c,-c svelte,time,0,0.035666,9847,236406
+svelte,tokei,svelte,time,0,0.092928,9847,226285
+svelte,ripcloc,svelte,time,1,0.049739,9847,236406
+svelte,ripcloc -c,-c svelte,time,1,0.038327,9847,236406
+svelte,tokei,svelte,time,1,0.093482,9847,226285
+svelte,scc,svelte,time,1,0.054641,9884,236503
+svelte,ripcloc -c,-c svelte,time,2,0.037836,9847,236406
+svelte,tokei,svelte,time,2,0.088593,9847,226285
+svelte,scc,svelte,time,2,0.048638,9884,236503
+svelte,ripcloc,svelte,time,2,0.038389,9847,236406
+svelte,tokei,svelte,time,3,0.089223,9847,226285
+svelte,scc,svelte,time,3,0.057930,9884,236503
+svelte,ripcloc,svelte,time,3,0.038098,9847,236406
+svelte,ripcloc -c,-c svelte,time,3,0.036628,9847,236406
+svelte,scc,svelte,time,4,0.042473,9884,236503
+svelte,ripcloc,svelte,time,4,0.039442,9847,236406
+svelte,ripcloc -c,-c svelte,time,4,0.035927,9847,236406
+svelte,tokei,svelte,time,4,0.089017,9847,226285
+svelte,ripcloc,svelte,time,5,0.047142,9847,236406
+svelte,ripcloc -c,-c svelte,time,5,0.036871,9847,236406
+svelte,tokei,svelte,time,5,0.097332,9847,226285
+svelte,scc,svelte,time,5,0.073281,9884,236503
+svelte,ripcloc -c,-c svelte,time,6,0.038256,9847,236406
+svelte,tokei,svelte,time,6,0.089385,9847,226285
+svelte,scc,svelte,time,6,0.051692,9884,236503
+svelte,ripcloc,svelte,time,6,0.039827,9847,236406
+svelte,tokei,svelte,time,7,0.079713,9847,226285
+svelte,scc,svelte,time,7,0.046060,9884,236503
+svelte,ripcloc,svelte,time,7,0.036589,9847,236406
+svelte,ripcloc -c,-c svelte,time,7,0.037264,9847,236406
+svelte,scc,svelte,time,8,0.042588,9884,236503
+svelte,ripcloc,svelte,time,8,0.036226,9847,236406
+svelte,ripcloc -c,-c svelte,time,8,0.036985,9847,236406
+svelte,tokei,svelte,time,8,0.085100,9847,226285
+svelte,ripcloc,svelte,time,9,0.037267,9847,236406
+svelte,ripcloc -c,-c svelte,time,9,0.033555,9847,236406
+svelte,tokei,svelte,time,9,0.087847,9847,226285
+svelte,scc,svelte,time,9,0.046510,9884,236503
+svelte,cloc,svelte,memory,0,36429824,9103,232319
+svelte,cloc,svelte,time,0,1.860845,9103,232319
+rails,ripcloc,rails,memory,0,8921088,4547,517499
+rails,ripcloc -c,-c rails,memory,0,8265728,4547,517499
+rails,tokei,rails,memory,0,15310848,4566,463934
+rails,scc,rails,memory,0,40529920,4745,522842
+rails,ripcloc,rails,memory,1,8904704,4547,517499
+rails,ripcloc -c,-c rails,memory,1,7917568,4547,517499
+rails,tokei,rails,memory,1,15867904,4566,463934
+rails,scc,rails,memory,1,41181184,4745,522842
+rails,ripcloc,rails,memory,2,8929280,4547,517499
+rails,ripcloc -c,-c rails,memory,2,7938048,4547,517499
+rails,tokei,rails,memory,2,14897152,4566,463934
+rails,scc,rails,memory,2,42364928,4745,522842
+rails,scc,rails,time,0,0.032958,4745,522842
+rails,ripcloc,rails,time,0,0.016622,4547,517499
+rails,ripcloc -c,-c rails,time,0,0.014789,4547,517499
+rails,tokei,rails,time,0,0.045872,4566,463934
+rails,ripcloc,rails,time,1,0.016576,4547,517499
+rails,ripcloc -c,-c rails,time,1,0.015543,4547,517499
+rails,tokei,rails,time,1,0.049897,4566,463934
+rails,scc,rails,time,1,0.031542,4745,522842
+rails,ripcloc -c,-c rails,time,2,0.015938,4547,517499
+rails,tokei,rails,time,2,0.049170,4566,463934
+rails,scc,rails,time,2,0.034113,4745,522842
+rails,ripcloc,rails,time,2,0.016918,4547,517499
+rails,tokei,rails,time,3,0.046567,4566,463934
+rails,scc,rails,time,3,0.033607,4745,522842
+rails,ripcloc,rails,time,3,0.016387,4547,517499
+rails,ripcloc -c,-c rails,time,3,0.016936,4547,517499
+rails,scc,rails,time,4,0.034069,4745,522842
+rails,ripcloc,rails,time,4,0.016434,4547,517499
+rails,ripcloc -c,-c rails,time,4,0.015603,4547,517499
+rails,tokei,rails,time,4,0.047072,4566,463934
+rails,ripcloc,rails,time,5,0.015633,4547,517499
+rails,ripcloc -c,-c rails,time,5,0.015644,4547,517499
+rails,tokei,rails,time,5,0.047140,4566,463934
+rails,scc,rails,time,5,0.033818,4745,522842
+rails,ripcloc -c,-c rails,time,6,0.016700,4547,517499
+rails,tokei,rails,time,6,0.047701,4566,463934
+rails,scc,rails,time,6,0.030360,4745,522842
+rails,ripcloc,rails,time,6,0.017543,4547,517499
+rails,tokei,rails,time,7,0.047266,4566,463934
+rails,scc,rails,time,7,0.034917,4745,522842
+rails,ripcloc,rails,time,7,0.016419,4547,517499
+rails,ripcloc -c,-c rails,time,7,0.015160,4547,517499
+rails,scc,rails,time,8,0.029372,4745,522842
+rails,ripcloc,rails,time,8,0.016367,4547,517499
+rails,ripcloc -c,-c rails,time,8,0.016536,4547,517499
+rails,tokei,rails,time,8,0.049155,4566,463934
+rails,ripcloc,rails,time,9,0.015957,4547,517499
+rails,ripcloc -c,-c rails,time,9,0.015622,4547,517499
+rails,tokei,rails,time,9,0.046151,4566,463934
+rails,scc,rails,time,9,0.033886,4745,522842
+rails,cloc,rails,memory,0,33996800,4398,516614
+rails,cloc,rails,time,0,2.199355,4398,516614
+spring,ripcloc,spring,memory,0,9322496,11054,977627
+spring,ripcloc -c,-c spring,memory,0,8777728,11054,977627
+spring,tokei,spring,memory,0,17117184,11106,978025
+spring,scc,spring,memory,0,58933248,11281,992355
+spring,ripcloc,spring,memory,1,8904704,11054,977627
+spring,ripcloc -c,-c spring,memory,1,8593408,11054,977627
+spring,tokei,spring,memory,1,17231872,11106,978025
+spring,scc,spring,memory,1,60715008,11281,992355
+spring,ripcloc,spring,memory,2,8720384,11054,977627
+spring,ripcloc -c,-c spring,memory,2,8798208,11054,977627
+spring,tokei,spring,memory,2,17018880,11106,978025
+spring,scc,spring,memory,2,58802176,11281,992355
+spring,scc,spring,time,0,0.063727,11281,992355
+spring,ripcloc,spring,time,0,0.033300,11054,977627
+spring,ripcloc -c,-c spring,time,0,0.033568,11054,977627
+spring,tokei,spring,time,0,0.102751,11106,978025
+spring,ripcloc,spring,time,1,0.033887,11054,977627
+spring,ripcloc -c,-c spring,time,1,0.032840,11054,977627
+spring,tokei,spring,time,1,0.099351,11106,978025
+spring,scc,spring,time,1,0.068248,11281,992355
+spring,ripcloc -c,-c spring,time,2,0.032572,11054,977627
+spring,tokei,spring,time,2,0.098930,11106,978025
+spring,scc,spring,time,2,0.068999,11281,992355
+spring,ripcloc,spring,time,2,0.034297,11054,977627
+spring,tokei,spring,time,3,0.101259,11106,978025
+spring,scc,spring,time,3,0.066598,11281,992355
+spring,ripcloc,spring,time,3,0.033643,11054,977627
+spring,ripcloc -c,-c spring,time,3,0.032529,11054,977627
+spring,scc,spring,time,4,0.070388,11281,992355
+spring,ripcloc,spring,time,4,0.033872,11054,977627
+spring,ripcloc -c,-c spring,time,4,0.035122,11054,977627
+spring,tokei,spring,time,4,0.098668,11106,978025
+spring,ripcloc,spring,time,5,0.033964,11054,977627
+spring,ripcloc -c,-c spring,time,5,0.033201,11054,977627
+spring,tokei,spring,time,5,0.097672,11106,978025
+spring,scc,spring,time,5,0.069863,11281,992355
+spring,ripcloc -c,-c spring,time,6,0.032108,11054,977627
+spring,tokei,spring,time,6,0.098782,11106,978025
+spring,scc,spring,time,6,0.066084,11281,992355
+spring,ripcloc,spring,time,6,0.033340,11054,977627
+spring,tokei,spring,time,7,0.102831,11106,978025
+spring,scc,spring,time,7,0.063787,11281,992355
+spring,ripcloc,spring,time,7,0.034791,11054,977627
+spring,ripcloc -c,-c spring,time,7,0.032027,11054,977627
+spring,scc,spring,time,8,0.064026,11281,992355
+spring,ripcloc,spring,time,8,0.033559,11054,977627
+spring,ripcloc -c,-c spring,time,8,0.032646,11054,977627
+spring,tokei,spring,time,8,0.098605,11106,978025
+spring,ripcloc,spring,time,9,0.034371,11054,977627
+spring,ripcloc -c,-c spring,time,9,0.033816,11054,977627
+spring,tokei,spring,time,9,0.101899,11106,978025
+spring,scc,spring,time,9,0.065598,11281,992355
+spring,cloc,spring,memory,0,44716032,11204,994909
+spring,cloc,spring,time,0,17.768588,11204,994909
+roslyn,ripcloc,roslyn,memory,0,32690176,23619,7335355
+roslyn,ripcloc -c,-c roslyn,memory,0,36896768,23619,7335355
+roslyn,tokei,roslyn,memory,0,59449344,33478,7499701
+roslyn,scc,roslyn,memory,0,112091136,33621,8224667
+roslyn,ripcloc,roslyn,memory,1,34226176,23619,7335355
+roslyn,ripcloc -c,-c roslyn,memory,1,34861056,23619,7335355
+roslyn,tokei,roslyn,memory,1,59482112,33478,7499701
+roslyn,scc,roslyn,memory,1,113201152,33621,8224667
+roslyn,ripcloc,roslyn,memory,2,33640448,23619,7335355
+roslyn,ripcloc -c,-c roslyn,memory,2,36577280,23619,7335355
+roslyn,tokei,roslyn,memory,2,55390208,33478,7499701
+roslyn,scc,roslyn,memory,2,113725440,33621,8224667
+roslyn,scc,roslyn,time,0,0.222729,33621,8224667
+roslyn,ripcloc,roslyn,time,0,0.099651,23619,7335355
+roslyn,ripcloc -c,-c roslyn,time,0,0.096561,23619,7335355
+roslyn,tokei,roslyn,time,0,0.346908,33478,7499701
+roslyn,ripcloc,roslyn,time,1,0.096066,23619,7335355
+roslyn,ripcloc -c,-c roslyn,time,1,0.096634,23619,7335355
+roslyn,tokei,roslyn,time,1,0.341187,33478,7499701
+roslyn,scc,roslyn,time,1,0.214785,33621,8224667
+roslyn,ripcloc -c,-c roslyn,time,2,0.090548,23619,7335355
+roslyn,tokei,roslyn,time,2,0.333799,33478,7499701
+roslyn,scc,roslyn,time,2,0.217950,33621,8224667
+roslyn,ripcloc,roslyn,time,2,0.096565,23619,7335355
+roslyn,tokei,roslyn,time,3,0.338329,33478,7499701
+roslyn,scc,roslyn,time,3,0.216989,33621,8224667
+roslyn,ripcloc,roslyn,time,3,0.093354,23619,7335355
+roslyn,ripcloc -c,-c roslyn,time,3,0.098479,23619,7335355
+roslyn,scc,roslyn,time,4,0.223245,33621,8224667
+roslyn,ripcloc,roslyn,time,4,0.096082,23619,7335355
+roslyn,ripcloc -c,-c roslyn,time,4,0.093650,23619,7335355
+roslyn,tokei,roslyn,time,4,0.350574,33478,7499701
+roslyn,ripcloc,roslyn,time,5,0.099040,23619,7335355
+roslyn,ripcloc -c,-c roslyn,time,5,0.096596,23619,7335355
+roslyn,tokei,roslyn,time,5,0.341502,33478,7499701
+roslyn,scc,roslyn,time,5,0.215631,33621,8224667
+roslyn,ripcloc -c,-c roslyn,time,6,0.092483,23619,7335355
+roslyn,tokei,roslyn,time,6,0.337209,33478,7499701
+roslyn,scc,roslyn,time,6,0.213394,33621,8224667
+roslyn,ripcloc,roslyn,time,6,0.098528,23619,7335355
+roslyn,tokei,roslyn,time,7,0.348984,33478,7499701
+roslyn,scc,roslyn,time,7,0.216620,33621,8224667
+roslyn,ripcloc,roslyn,time,7,0.094187,23619,7335355
+roslyn,ripcloc -c,-c roslyn,time,7,0.096201,23619,7335355
+roslyn,scc,roslyn,time,8,0.211395,33621,8224667
+roslyn,ripcloc,roslyn,time,8,0.102445,23619,7335355
+roslyn,ripcloc -c,-c roslyn,time,8,0.099166,23619,7335355
+roslyn,tokei,roslyn,time,8,0.348288,33478,7499701
+roslyn,ripcloc,roslyn,time,9,0.098735,23619,7335355
+roslyn,ripcloc -c,-c roslyn,time,9,0.095250,23619,7335355
+roslyn,tokei,roslyn,time,9,0.342584,33478,7499701
+roslyn,scc,roslyn,time,9,0.220827,33621,8224667
+roslyn,cloc,roslyn,memory,0,184229888,32257,8598036
+roslyn,cloc,roslyn,time,0,98.016030,32257,8598036
+cpython,ripcloc,cpython,memory,0,15962112,4789,2337505
+cpython,ripcloc -c,-c cpython,memory,0,14864384,4789,2337505
+cpython,tokei,cpython,memory,0,27152384,5053,2331878
+cpython,scc,cpython,memory,0,63860736,5174,2422354
+cpython,ripcloc,cpython,memory,1,16064512,4789,2337505
+cpython,ripcloc -c,-c cpython,memory,1,14864384,4789,2337505
+cpython,tokei,cpython,memory,1,25628672,5053,2331878
+cpython,scc,cpython,memory,1,63275008,5174,2422354
+cpython,ripcloc,cpython,memory,2,15740928,4789,2337505
+cpython,ripcloc -c,-c cpython,memory,2,15470592,4789,2337505
+cpython,tokei,cpython,memory,2,26664960,5053,2331878
+cpython,scc,cpython,memory,2,62095360,5174,2422354
+cpython,scc,cpython,time,0,0.067556,5174,2422354
+cpython,ripcloc,cpython,time,0,0.027100,4789,2337505
+cpython,ripcloc -c,-c cpython,time,0,0.024699,4789,2337505
+cpython,tokei,cpython,time,0,0.103404,5053,2331878
+cpython,ripcloc,cpython,time,1,0.026664,4789,2337505
+cpython,ripcloc -c,-c cpython,time,1,0.025212,4789,2337505
+cpython,tokei,cpython,time,1,0.097652,5053,2331878
+cpython,scc,cpython,time,1,0.066211,5174,2422354
+cpython,ripcloc -c,-c cpython,time,2,0.024812,4789,2337505
+cpython,tokei,cpython,time,2,0.102495,5053,2331878
+cpython,scc,cpython,time,2,0.068839,5174,2422354
+cpython,ripcloc,cpython,time,2,0.026543,4789,2337505
+cpython,tokei,cpython,time,3,0.103634,5053,2331878
+cpython,scc,cpython,time,3,0.069693,5174,2422354
+cpython,ripcloc,cpython,time,3,0.026333,4789,2337505
+cpython,ripcloc -c,-c cpython,time,3,0.026111,4789,2337505
+cpython,scc,cpython,time,4,0.066382,5174,2422354
+cpython,ripcloc,cpython,time,4,0.026604,4789,2337505
+cpython,ripcloc -c,-c cpython,time,4,0.025433,4789,2337505
+cpython,tokei,cpython,time,4,0.101759,5053,2331878
+cpython,ripcloc,cpython,time,5,0.027316,4789,2337505
+cpython,ripcloc -c,-c cpython,time,5,0.025415,4789,2337505
+cpython,tokei,cpython,time,5,0.102258,5053,2331878
+cpython,scc,cpython,time,5,0.068108,5174,2422354
+cpython,ripcloc -c,-c cpython,time,6,0.025554,4789,2337505
+cpython,tokei,cpython,time,6,0.103795,5053,2331878
+cpython,scc,cpython,time,6,0.067964,5174,2422354
+cpython,ripcloc,cpython,time,6,0.026528,4789,2337505
+cpython,tokei,cpython,time,7,0.102649,5053,2331878
+cpython,scc,cpython,time,7,0.067282,5174,2422354
+cpython,ripcloc,cpython,time,7,0.027901,4789,2337505
+cpython,ripcloc -c,-c cpython,time,7,0.025224,4789,2337505
+cpython,scc,cpython,time,8,0.068662,5174,2422354
+cpython,ripcloc,cpython,time,8,0.025897,4789,2337505
+cpython,ripcloc -c,-c cpython,time,8,0.025036,4789,2337505
+cpython,tokei,cpython,time,8,0.097849,5053,2331878
+cpython,ripcloc,cpython,time,9,0.026980,4789,2337505
+cpython,ripcloc -c,-c cpython,time,9,0.024266,4789,2337505
+cpython,tokei,cpython,time,9,0.101781,5053,2331878
+cpython,scc,cpython,time,9,0.066668,5174,2422354
+cpython,cloc,cpython,memory,0,76083200,5022,2137925
+cpython,cloc,cpython,time,0,11.240043,5022,2137925
+kubernetes,ripcloc,kubernetes,memory,0,38559744,22618,4857020
+kubernetes,ripcloc -c,-c kubernetes,memory,0,31838208,22618,4857020
+kubernetes,tokei,kubernetes,memory,0,56758272,27568,5934785
+kubernetes,scc,kubernetes,memory,0,100352000,28101,6090805
+kubernetes,ripcloc,kubernetes,memory,1,29306880,22618,4857020
+kubernetes,ripcloc -c,-c kubernetes,memory,1,33550336,22618,4857020
+kubernetes,tokei,kubernetes,memory,1,58675200,27568,5934785
+kubernetes,scc,kubernetes,memory,1,96096256,28101,6090805
+kubernetes,ripcloc,kubernetes,memory,2,31473664,22618,4857020
+kubernetes,ripcloc -c,-c kubernetes,memory,2,36233216,22618,4857020
+kubernetes,tokei,kubernetes,memory,2,58081280,27568,5934785
+kubernetes,scc,kubernetes,memory,2,101867520,28101,6090805
+kubernetes,scc,kubernetes,time,0,0.176774,28101,6090805
+kubernetes,ripcloc,kubernetes,time,0,0.067550,22618,4857020
+kubernetes,ripcloc -c,-c kubernetes,time,0,0.064989,22618,4857020
+kubernetes,tokei,kubernetes,time,0,0.260924,27568,5934785
+kubernetes,ripcloc,kubernetes,time,1,0.068468,22618,4857020
+kubernetes,ripcloc -c,-c kubernetes,time,1,0.063058,22618,4857020
+kubernetes,tokei,kubernetes,time,1,0.270094,27568,5934785
+kubernetes,scc,kubernetes,time,1,0.175510,28101,6090805
+kubernetes,ripcloc -c,-c kubernetes,time,2,0.066464,22618,4857020
+kubernetes,tokei,kubernetes,time,2,0.266590,27568,5934785
+kubernetes,scc,kubernetes,time,2,0.175789,28101,6090805
+kubernetes,ripcloc,kubernetes,time,2,0.065966,22618,4857020
+kubernetes,tokei,kubernetes,time,3,0.279306,27568,5934785
+kubernetes,scc,kubernetes,time,3,0.176419,28101,6090805
+kubernetes,ripcloc,kubernetes,time,3,0.067789,22618,4857020
+kubernetes,ripcloc -c,-c kubernetes,time,3,0.063612,22618,4857020
+kubernetes,scc,kubernetes,time,4,0.174289,28101,6090805
+kubernetes,ripcloc,kubernetes,time,4,0.067980,22618,4857020
+kubernetes,ripcloc -c,-c kubernetes,time,4,0.063699,22618,4857020
+kubernetes,tokei,kubernetes,time,4,0.269519,27568,5934785
+kubernetes,ripcloc,kubernetes,time,5,0.067661,22618,4857020
+kubernetes,ripcloc -c,-c kubernetes,time,5,0.064293,22618,4857020
+kubernetes,tokei,kubernetes,time,5,0.284524,27568,5934785
+kubernetes,scc,kubernetes,time,5,0.172985,28101,6090805
+kubernetes,ripcloc -c,-c kubernetes,time,6,0.065233,22618,4857020
+kubernetes,tokei,kubernetes,time,6,0.280071,27568,5934785
+kubernetes,scc,kubernetes,time,6,0.173672,28101,6090805
+kubernetes,ripcloc,kubernetes,time,6,0.067019,22618,4857020
+kubernetes,tokei,kubernetes,time,7,0.278344,27568,5934785
+kubernetes,scc,kubernetes,time,7,0.178485,28101,6090805
+kubernetes,ripcloc,kubernetes,time,7,0.070398,22618,4857020
+kubernetes,ripcloc -c,-c kubernetes,time,7,0.063464,22618,4857020
+kubernetes,scc,kubernetes,time,8,0.177780,28101,6090805
+kubernetes,ripcloc,kubernetes,time,8,0.068332,22618,4857020
+kubernetes,ripcloc -c,-c kubernetes,time,8,0.063785,22618,4857020
+kubernetes,tokei,kubernetes,time,8,0.274351,27568,5934785
+kubernetes,ripcloc,kubernetes,time,9,0.069421,22618,4857020
+kubernetes,ripcloc -c,-c kubernetes,time,9,0.064510,22618,4857020
+kubernetes,tokei,kubernetes,time,9,0.271502,27568,5934785
+kubernetes,scc,kubernetes,time,9,0.176416,28101,6090805
+kubernetes,cloc,kubernetes,memory,0,121942016,21424,5811084
+kubernetes,cloc,kubernetes,time,0,62.105377,21424,5811084
+swiftpm,ripcloc,swiftpm,memory,0,10166272,2514,353846
+swiftpm,ripcloc -c,-c swiftpm,memory,0,9211904,2514,353846
+swiftpm,tokei,swiftpm,memory,0,13037568,2537,339121
+swiftpm,scc,swiftpm,memory,0,46882816,2551,356773
+swiftpm,ripcloc,swiftpm,memory,1,9297920,2514,353846
+swiftpm,ripcloc -c,-c swiftpm,memory,1,8835072,2514,353846
+swiftpm,tokei,swiftpm,memory,1,13230080,2537,339121
+swiftpm,scc,swiftpm,memory,1,47083520,2551,356773
+swiftpm,ripcloc,swiftpm,memory,2,10362880,2514,353846
+swiftpm,ripcloc -c,-c swiftpm,memory,2,8908800,2514,353846
+swiftpm,tokei,swiftpm,memory,2,13078528,2537,339121
+swiftpm,scc,swiftpm,memory,2,45449216,2551,356773
+swiftpm,scc,swiftpm,time,0,0.027133,2551,356773
+swiftpm,ripcloc,swiftpm,time,0,0.017052,2514,353846
+swiftpm,ripcloc -c,-c swiftpm,time,0,0.016145,2514,353846
+swiftpm,tokei,swiftpm,time,0,0.035726,2537,339121
+swiftpm,ripcloc,swiftpm,time,1,0.016468,2514,353846
+swiftpm,ripcloc -c,-c swiftpm,time,1,0.016257,2514,353846
+swiftpm,tokei,swiftpm,time,1,0.037270,2537,339121
+swiftpm,scc,swiftpm,time,1,0.031345,2551,356773
+swiftpm,ripcloc -c,-c swiftpm,time,2,0.016114,2514,353846
+swiftpm,tokei,swiftpm,time,2,0.038266,2537,339121
+swiftpm,scc,swiftpm,time,2,0.028608,2551,356773
+swiftpm,ripcloc,swiftpm,time,2,0.016708,2514,353846
+swiftpm,tokei,swiftpm,time,3,0.035348,2537,339121
+swiftpm,scc,swiftpm,time,3,0.032145,2551,356773
+swiftpm,ripcloc,swiftpm,time,3,0.017033,2514,353846
+swiftpm,ripcloc -c,-c swiftpm,time,3,0.016318,2514,353846
+swiftpm,scc,swiftpm,time,4,0.034383,2551,356773
+swiftpm,ripcloc,swiftpm,time,4,0.016775,2514,353846
+swiftpm,ripcloc -c,-c swiftpm,time,4,0.015970,2514,353846
+swiftpm,tokei,swiftpm,time,4,0.037268,2537,339121
+swiftpm,ripcloc,swiftpm,time,5,0.016564,2514,353846
+swiftpm,ripcloc -c,-c swiftpm,time,5,0.015597,2514,353846
+swiftpm,tokei,swiftpm,time,5,0.036640,2537,339121
+swiftpm,scc,swiftpm,time,5,0.031214,2551,356773
+swiftpm,ripcloc -c,-c swiftpm,time,6,0.016958,2514,353846
+swiftpm,tokei,swiftpm,time,6,0.036593,2537,339121
+swiftpm,scc,swiftpm,time,6,0.033367,2551,356773
+swiftpm,ripcloc,swiftpm,time,6,0.016381,2514,353846
+swiftpm,tokei,swiftpm,time,7,0.036968,2537,339121
+swiftpm,scc,swiftpm,time,7,0.031417,2551,356773
+swiftpm,ripcloc,swiftpm,time,7,0.016549,2514,353846
+swiftpm,ripcloc -c,-c swiftpm,time,7,0.017031,2514,353846
+swiftpm,scc,swiftpm,time,8,0.032249,2551,356773
+swiftpm,ripcloc,swiftpm,time,8,0.016394,2514,353846
+swiftpm,ripcloc -c,-c swiftpm,time,8,0.015172,2514,353846
+swiftpm,tokei,swiftpm,time,8,0.037321,2537,339121
+swiftpm,ripcloc,swiftpm,time,9,0.016920,2514,353846
+swiftpm,ripcloc -c,-c swiftpm,time,9,0.017458,2514,353846
+swiftpm,tokei,swiftpm,time,9,0.036614,2537,339121
+swiftpm,scc,swiftpm,time,9,0.032894,2551,356773
+swiftpm,cloc,swiftpm,memory,0,40964096,2390,351007
+swiftpm,cloc,swiftpm,time,0,4.151231,2390,351007
+okhttp,ripcloc,okhttp,memory,0,6475776,775,117861
+okhttp,ripcloc -c,-c okhttp,memory,0,6168576,775,117861
+okhttp,tokei,okhttp,memory,0,9584640,789,113578
+okhttp,scc,okhttp,memory,0,27164672,808,130390
+okhttp,ripcloc,okhttp,memory,1,6283264,775,117861
+okhttp,ripcloc -c,-c okhttp,memory,1,6307840,775,117861
+okhttp,tokei,okhttp,memory,1,9637888,789,113578
+okhttp,scc,okhttp,memory,1,29327360,808,130390
+okhttp,ripcloc,okhttp,memory,2,6361088,775,117861
+okhttp,ripcloc -c,-c okhttp,memory,2,5885952,775,117861
+okhttp,tokei,okhttp,memory,2,9629696,789,113578
+okhttp,scc,okhttp,memory,2,28602368,808,130390
+okhttp,scc,okhttp,time,0,0.037027,808,130390
+okhttp,ripcloc,okhttp,time,0,0.014672,775,117861
+okhttp,ripcloc -c,-c okhttp,time,0,0.015451,775,117861
+okhttp,tokei,okhttp,time,0,0.039676,789,113578
+okhttp,ripcloc,okhttp,time,1,0.013731,775,117861
+okhttp,ripcloc -c,-c okhttp,time,1,0.013143,775,117861
+okhttp,tokei,okhttp,time,1,0.034891,789,113578
+okhttp,scc,okhttp,time,1,0.029330,808,130390
+okhttp,ripcloc -c,-c okhttp,time,2,0.012467,775,117861
+okhttp,tokei,okhttp,time,2,0.035059,789,113578
+okhttp,scc,okhttp,time,2,0.042143,808,130390
+okhttp,ripcloc,okhttp,time,2,0.014437,775,117861
+okhttp,tokei,okhttp,time,3,0.041212,789,113578
+okhttp,scc,okhttp,time,3,0.043704,808,130390
+okhttp,ripcloc,okhttp,time,3,0.014947,775,117861
+okhttp,ripcloc -c,-c okhttp,time,3,0.014383,775,117861
+okhttp,scc,okhttp,time,4,0.045106,808,130390
+okhttp,ripcloc,okhttp,time,4,0.015453,775,117861
+okhttp,ripcloc -c,-c okhttp,time,4,0.014709,775,117861
+okhttp,tokei,okhttp,time,4,0.041627,789,113578
+okhttp,ripcloc,okhttp,time,5,0.015058,775,117861
+okhttp,ripcloc -c,-c okhttp,time,5,0.014263,775,117861
+okhttp,tokei,okhttp,time,5,0.037923,789,113578
+okhttp,scc,okhttp,time,5,0.044468,808,130390
+okhttp,ripcloc -c,-c okhttp,time,6,0.015073,775,117861
+okhttp,tokei,okhttp,time,6,0.040978,789,113578
+okhttp,scc,okhttp,time,6,0.041655,808,130390
+okhttp,ripcloc,okhttp,time,6,0.015181,775,117861
+okhttp,tokei,okhttp,time,7,0.042422,789,113578
+okhttp,scc,okhttp,time,7,0.040746,808,130390
+okhttp,ripcloc,okhttp,time,7,0.015077,775,117861
+okhttp,ripcloc -c,-c okhttp,time,7,0.014127,775,117861
+okhttp,scc,okhttp,time,8,0.045513,808,130390
+okhttp,ripcloc,okhttp,time,8,0.015465,775,117861
+okhttp,ripcloc -c,-c okhttp,time,8,0.014195,775,117861
+okhttp,tokei,okhttp,time,8,0.042261,789,113578
+okhttp,ripcloc,okhttp,time,9,0.015491,775,117861
+okhttp,ripcloc -c,-c okhttp,time,9,0.014933,775,117861
+okhttp,tokei,okhttp,time,9,0.038677,789,113578
+okhttp,scc,okhttp,time,9,0.039407,808,130390
+okhttp,cloc,okhttp,memory,0,32116736,806,130280
+okhttp,cloc,okhttp,time,0,0.544982,806,130280
+react_native,ripcloc,react-native,memory,0,11542528,6614,815763
+react_native,ripcloc -c,-c react-native,memory,0,10629120,6614,815763
+react_native,tokei,react-native,memory,0,21606400,7366,817224
+react_native,scc,react-native,memory,0,96235520,7697,859950
+react_native,ripcloc,react-native,memory,1,11456512,6614,815763
+react_native,ripcloc -c,-c react-native,memory,1,10690560,6614,815763
+react_native,tokei,react-native,memory,1,23519232,7366,817224
+react_native,scc,react-native,memory,1,97546240,7697,859950
+react_native,ripcloc,react-native,memory,2,11735040,6614,815763
+react_native,ripcloc -c,-c react-native,memory,2,10825728,6614,815763
+react_native,tokei,react-native,memory,2,22646784,7366,817224
+react_native,scc,react-native,memory,2,97091584,7697,859950
+react_native,scc,react-native,time,0,0.090762,7697,859950
+react_native,ripcloc,react-native,time,0,0.026574,6614,815763
+react_native,ripcloc -c,-c react-native,time,0,0.025633,6614,815763
+react_native,tokei,react-native,time,0,0.104795,7366,817224
+react_native,ripcloc,react-native,time,1,0.026973,6614,815763
+react_native,ripcloc -c,-c react-native,time,1,0.024944,6614,815763
+react_native,tokei,react-native,time,1,0.090617,7366,817224
+react_native,scc,react-native,time,1,0.091702,7697,859950
+react_native,ripcloc -c,-c react-native,time,2,0.025599,6614,815763
+react_native,tokei,react-native,time,2,0.090855,7366,817224
+react_native,scc,react-native,time,2,0.091358,7697,859950
+react_native,ripcloc,react-native,time,2,0.028123,6614,815763
+react_native,tokei,react-native,time,3,0.088344,7366,817224
+react_native,scc,react-native,time,3,0.090597,7697,859950
+react_native,ripcloc,react-native,time,3,0.026486,6614,815763
+react_native,ripcloc -c,-c react-native,time,3,0.024896,6614,815763
+react_native,scc,react-native,time,4,0.088526,7697,859950
+react_native,ripcloc,react-native,time,4,0.026581,6614,815763
+react_native,ripcloc -c,-c react-native,time,4,0.024535,6614,815763
+react_native,tokei,react-native,time,4,0.088231,7366,817224
+react_native,ripcloc,react-native,time,5,0.026774,6614,815763
+react_native,ripcloc -c,-c react-native,time,5,0.024792,6614,815763
+react_native,tokei,react-native,time,5,0.091658,7366,817224
+react_native,scc,react-native,time,5,0.090023,7697,859950
+react_native,ripcloc -c,-c react-native,time,6,0.024901,6614,815763
+react_native,tokei,react-native,time,6,0.088506,7366,817224
+react_native,scc,react-native,time,6,0.095287,7697,859950
+react_native,ripcloc,react-native,time,6,0.027230,6614,815763
+react_native,tokei,react-native,time,7,0.090497,7366,817224
+react_native,scc,react-native,time,7,0.092399,7697,859950
+react_native,ripcloc,react-native,time,7,0.026854,6614,815763
+react_native,ripcloc -c,-c react-native,time,7,0.024679,6614,815763
+react_native,scc,react-native,time,8,0.088521,7697,859950
+react_native,ripcloc,react-native,time,8,0.026820,6614,815763
+react_native,ripcloc -c,-c react-native,time,8,0.024846,6614,815763
+react_native,tokei,react-native,time,8,0.091952,7366,817224
+react_native,ripcloc,react-native,time,9,0.026759,6614,815763
+react_native,ripcloc -c,-c react-native,time,9,0.024443,6614,815763
+react_native,tokei,react-native,time,9,0.105126,7366,817224
+react_native,scc,react-native,time,9,0.089430,7697,859950
+react_native,cloc,react-native,memory,0,108986368,7570,845567
+react_native,cloc,react-native,time,0,4.611967,7570,845567
+flutter,ripcloc,flutter,memory,0,20787200,12728,2799342
+flutter,ripcloc -c,-c flutter,memory,0,20107264,12728,2799342
+flutter,tokei,flutter,memory,0,27717632,13569,2794865
+flutter,scc,flutter,memory,0,164716544,14256,2890645
+flutter,ripcloc,flutter,memory,1,21024768,12728,2799342
+flutter,ripcloc -c,-c flutter,memory,1,18419712,12728,2799342
+flutter,tokei,flutter,memory,1,28987392,13569,2794865
+flutter,scc,flutter,memory,1,172183552,14256,2890645
+flutter,ripcloc,flutter,memory,2,21831680,12728,2799342
+flutter,ripcloc -c,-c flutter,memory,2,20176896,12728,2799342
+flutter,tokei,flutter,memory,2,31551488,13569,2794865
+flutter,scc,flutter,memory,2,181379072,14256,2890645
+flutter,scc,flutter,time,0,0.176296,14256,2890645
+flutter,ripcloc,flutter,time,0,0.053611,12728,2799342
+flutter,ripcloc -c,-c flutter,time,0,0.050796,12728,2799342
+flutter,tokei,flutter,time,0,0.236204,13569,2794865
+flutter,ripcloc,flutter,time,1,0.053753,12728,2799342
+flutter,ripcloc -c,-c flutter,time,1,0.049694,12728,2799342
+flutter,tokei,flutter,time,1,0.269847,13569,2794865
+flutter,scc,flutter,time,1,0.191400,14256,2890645
+flutter,ripcloc -c,-c flutter,time,2,0.053576,12728,2799342
+flutter,tokei,flutter,time,2,0.239769,13569,2794865
+flutter,scc,flutter,time,2,0.189680,14256,2890645
+flutter,ripcloc,flutter,time,2,0.054032,12728,2799342
+flutter,tokei,flutter,time,3,0.272847,13569,2794865
+flutter,scc,flutter,time,3,0.211294,14256,2890645
+flutter,ripcloc,flutter,time,3,0.054219,12728,2799342
+flutter,ripcloc -c,-c flutter,time,3,0.049636,12728,2799342
+flutter,scc,flutter,time,4,0.181395,14256,2890645
+flutter,ripcloc,flutter,time,4,0.052667,12728,2799342
+flutter,ripcloc -c,-c flutter,time,4,0.051062,12728,2799342
+flutter,tokei,flutter,time,4,0.273073,13569,2794865
+flutter,ripcloc,flutter,time,5,0.055004,12728,2799342
+flutter,ripcloc -c,-c flutter,time,5,0.049745,12728,2799342
+flutter,tokei,flutter,time,5,0.242000,13569,2794865
+flutter,scc,flutter,time,5,0.182718,14256,2890645
+flutter,ripcloc -c,-c flutter,time,6,0.049767,12728,2799342
+flutter,tokei,flutter,time,6,0.268328,13569,2794865
+flutter,scc,flutter,time,6,0.182833,14256,2890645
+flutter,ripcloc,flutter,time,6,0.053600,12728,2799342
+flutter,tokei,flutter,time,7,0.268755,13569,2794865
+flutter,scc,flutter,time,7,0.198701,14256,2890645
+flutter,ripcloc,flutter,time,7,0.052598,12728,2799342
+flutter,ripcloc -c,-c flutter,time,7,0.050813,12728,2799342
+flutter,scc,flutter,time,8,0.184011,14256,2890645
+flutter,ripcloc,flutter,time,8,0.052619,12728,2799342
+flutter,ripcloc -c,-c flutter,time,8,0.051205,12728,2799342
+flutter,tokei,flutter,time,8,0.232031,13569,2794865
+flutter,ripcloc,flutter,time,9,0.055930,12728,2799342
+flutter,ripcloc -c,-c flutter,time,9,0.049828,12728,2799342
+flutter,tokei,flutter,time,9,0.242245,13569,2794865
+flutter,scc,flutter,time,9,0.179257,14256,2890645
+flutter,cloc,flutter,memory,0,83935232,13026,2817524
+flutter,cloc,flutter,time,0,19.844563,13026,2817524
+polyglot,ripcloc,polyglot,memory,0,16637952,24622,3021699
+polyglot,ripcloc -c,-c polyglot,memory,0,15142912,24622,3021699
+polyglot,tokei,polyglot,memory,0,34267136,25730,2983818
+polyglot,scc,polyglot,memory,0,105537536,28387,3556489
+polyglot,ripcloc,polyglot,memory,1,16130048,24622,3021699
+polyglot,ripcloc -c,-c polyglot,memory,1,15540224,24622,3021699
+polyglot,tokei,polyglot,memory,1,34926592,25730,2983818
+polyglot,scc,polyglot,memory,1,95969280,28387,3556489
+polyglot,ripcloc,polyglot,memory,2,16506880,24622,3021699
+polyglot,ripcloc -c,-c polyglot,memory,2,14389248,24622,3021699
+polyglot,tokei,polyglot,memory,2,34803712,25730,2983818
+polyglot,scc,polyglot,memory,2,104095744,28387,3556489
+polyglot,scc,polyglot,time,0,0.147371,28387,3556489
+polyglot,ripcloc,polyglot,time,0,0.068046,24622,3021699
+polyglot,ripcloc -c,-c polyglot,time,0,0.063141,24622,3021699
+polyglot,tokei,polyglot,time,0,0.209737,25730,2983818
+polyglot,ripcloc,polyglot,time,1,0.068890,24622,3021699
+polyglot,ripcloc -c,-c polyglot,time,1,0.064241,24622,3021699
+polyglot,tokei,polyglot,time,1,0.207601,25730,2983818
+polyglot,scc,polyglot,time,1,0.144722,28387,3556489
+polyglot,ripcloc -c,-c polyglot,time,2,0.064201,24622,3021699
+polyglot,tokei,polyglot,time,2,0.212000,25730,2983818
+polyglot,scc,polyglot,time,2,0.142100,28387,3556489
+polyglot,ripcloc,polyglot,time,2,0.070456,24622,3021699
+polyglot,tokei,polyglot,time,3,0.219394,25730,2983818
+polyglot,scc,polyglot,time,3,0.141962,28387,3556489
+polyglot,ripcloc,polyglot,time,3,0.067779,24622,3021699
+polyglot,ripcloc -c,-c polyglot,time,3,0.063931,24622,3021699
+polyglot,scc,polyglot,time,4,0.143456,28387,3556489
+polyglot,ripcloc,polyglot,time,4,0.067597,24622,3021699
+polyglot,ripcloc -c,-c polyglot,time,4,0.064260,24622,3021699
+polyglot,tokei,polyglot,time,4,0.212636,25730,2983818
+polyglot,ripcloc,polyglot,time,5,0.068351,24622,3021699
+polyglot,ripcloc -c,-c polyglot,time,5,0.066378,24622,3021699
+polyglot,tokei,polyglot,time,5,0.219104,25730,2983818
+polyglot,scc,polyglot,time,5,0.143499,28387,3556489
+polyglot,ripcloc -c,-c polyglot,time,6,0.065475,24622,3021699
+polyglot,tokei,polyglot,time,6,0.214811,25730,2983818
+polyglot,scc,polyglot,time,6,0.149388,28387,3556489
+polyglot,ripcloc,polyglot,time,6,0.067915,24622,3021699
+polyglot,tokei,polyglot,time,7,0.207478,25730,2983818
+polyglot,scc,polyglot,time,7,0.142933,28387,3556489
+polyglot,ripcloc,polyglot,time,7,0.068469,24622,3021699
+polyglot,ripcloc -c,-c polyglot,time,7,0.065200,24622,3021699
+polyglot,scc,polyglot,time,8,0.144934,28387,3556489
+polyglot,ripcloc,polyglot,time,8,0.069107,24622,3021699
+polyglot,ripcloc -c,-c polyglot,time,8,0.064034,24622,3021699
+polyglot,tokei,polyglot,time,8,0.207835,25730,2983818
+polyglot,ripcloc,polyglot,time,9,0.076979,24622,3021699
+polyglot,ripcloc -c,-c polyglot,time,9,0.064896,24622,3021699
+polyglot,tokei,polyglot,time,9,0.210816,25730,2983818
+polyglot,scc,polyglot,time,9,0.154168,28387,3556489
+polyglot,cloc,polyglot,memory,0,141807616,25045,3196624
+polyglot,cloc,polyglot,time,0,35.860087,25045,3196624
+rust,ripcloc,rust,memory,0,46641152,42921,4104014
+rust,ripcloc -c,-c rust,memory,0,44314624,42921,4104014
+rust,tokei,rust,memory,0,104296448,43196,4036065
+rust,scc,rust,memory,0,125984768,44331,4216656
+rust,ripcloc,rust,memory,1,44675072,42921,4104014
+rust,ripcloc -c,-c rust,memory,1,40116224,42921,4104014
+rust,tokei,rust,memory,1,108187648,43196,4036065
+rust,scc,rust,memory,1,135614464,44331,4216656
+rust,ripcloc,rust,memory,2,45699072,42921,4104014
+rust,ripcloc -c,-c rust,memory,2,38862848,42921,4104014
+rust,tokei,rust,memory,2,102346752,43196,4036065
+rust,scc,rust,memory,2,142954496,44331,4216656
+rust,scc,rust,time,0,0.183640,44331,4216656
+rust,ripcloc,rust,time,0,0.111711,42921,4104014
+rust,ripcloc -c,-c rust,time,0,0.094937,42921,4104014
+rust,tokei,rust,time,0,0.360614,43196,4036065
+rust,ripcloc,rust,time,1,0.103740,42921,4104014
+rust,ripcloc -c,-c rust,time,1,0.097381,42921,4104014
+rust,tokei,rust,time,1,0.374871,43196,4036065
+rust,scc,rust,time,1,0.192757,44331,4216656
+rust,ripcloc -c,-c rust,time,2,0.091146,42921,4104014
+rust,tokei,rust,time,2,0.367480,43196,4036065
+rust,scc,rust,time,2,0.190336,44331,4216656
+rust,ripcloc,rust,time,2,0.105517,42921,4104014
+rust,tokei,rust,time,3,0.349607,43196,4036065
+rust,scc,rust,time,3,0.190926,44331,4216656
+rust,ripcloc,rust,time,3,0.104046,42921,4104014
+rust,ripcloc -c,-c rust,time,3,0.091771,42921,4104014
+rust,scc,rust,time,4,0.185396,44331,4216656
+rust,ripcloc,rust,time,4,0.105966,42921,4104014
+rust,ripcloc -c,-c rust,time,4,0.098722,42921,4104014
+rust,tokei,rust,time,4,0.354916,43196,4036065
+rust,ripcloc,rust,time,5,0.107460,42921,4104014
+rust,ripcloc -c,-c rust,time,5,0.092300,42921,4104014
+rust,tokei,rust,time,5,0.358061,43196,4036065
+rust,scc,rust,time,5,0.203821,44331,4216656
+rust,ripcloc -c,-c rust,time,6,0.093587,42921,4104014
+rust,tokei,rust,time,6,0.366210,43196,4036065
+rust,scc,rust,time,6,0.187860,44331,4216656
+rust,ripcloc,rust,time,6,0.104992,42921,4104014
+rust,tokei,rust,time,7,0.360067,43196,4036065
+rust,scc,rust,time,7,0.184413,44331,4216656
+rust,ripcloc,rust,time,7,0.106419,42921,4104014
+rust,ripcloc -c,-c rust,time,7,0.097404,42921,4104014
+rust,scc,rust,time,8,0.186792,44331,4216656
+rust,ripcloc,rust,time,8,0.106779,42921,4104014
+rust,ripcloc -c,-c rust,time,8,0.088775,42921,4104014
+rust,tokei,rust,time,8,0.346847,43196,4036065
+rust,ripcloc,rust,time,9,0.108762,42921,4104014
+rust,ripcloc -c,-c rust,time,9,0.091220,42921,4104014
+rust,tokei,rust,time,9,0.362189,43196,4036065
+rust,scc,rust,time,9,0.185410,44331,4216656
+rust,cloc,rust,memory,0,260128768,43877,4163944
+rust,cloc,rust,time,0,20.474980,43877,4163944
+linux,ripcloc,linux,memory,0,66129920,90123,33309313
+linux,ripcloc -c,-c linux,memory,0,123650048,90123,33309313
+linux,tokei,linux,memory,0,285908992,91270,33396065
+linux,scc,linux,memory,0,395792384,91228,33464408
+linux,ripcloc,linux,memory,1,58560512,90123,33309313
+linux,ripcloc -c,-c linux,memory,1,132050944,90123,33309313
+linux,tokei,linux,memory,1,284868608,91270,33396065
+linux,scc,linux,memory,1,372068352,91228,33464408
+linux,ripcloc,linux,memory,2,115736576,90123,33309313
+linux,ripcloc -c,-c linux,memory,2,129425408,90123,33309313
+linux,tokei,linux,memory,2,278093824,91270,33396065
+linux,scc,linux,memory,2,381050880,91228,33464408
+linux,scc,linux,time,0,0.669099,91228,33464408
+linux,ripcloc,linux,time,0,0.222734,90123,33309313
+linux,ripcloc -c,-c linux,time,0,0.212689,90123,33309313
+linux,tokei,linux,time,0,0.930430,91270,33396065
+linux,ripcloc,linux,time,1,0.223191,90123,33309313
+linux,ripcloc -c,-c linux,time,1,0.209779,90123,33309313
+linux,tokei,linux,time,1,0.932035,91270,33396065
+linux,scc,linux,time,1,0.672569,91228,33464408
+linux,ripcloc -c,-c linux,time,2,0.221484,90123,33309313
+linux,tokei,linux,time,2,0.937112,91270,33396065
+linux,scc,linux,time,2,0.681025,91228,33464408
+linux,ripcloc,linux,time,2,0.236809,90123,33309313
+linux,tokei,linux,time,3,0.959743,91270,33396065
+linux,scc,linux,time,3,0.681481,91228,33464408
+linux,ripcloc,linux,time,3,0.224335,90123,33309313
+linux,ripcloc -c,-c linux,time,3,0.216779,90123,33309313
+linux,scc,linux,time,4,0.671564,91228,33464408
+linux,ripcloc,linux,time,4,0.234646,90123,33309313
+linux,ripcloc -c,-c linux,time,4,0.214389,90123,33309313
+linux,tokei,linux,time,4,0.931160,91270,33396065
+linux,ripcloc,linux,time,5,0.226576,90123,33309313
+linux,ripcloc -c,-c linux,time,5,0.226725,90123,33309313
+linux,tokei,linux,time,5,0.954570,91270,33396065
+linux,scc,linux,time,5,0.675284,91228,33464408
+linux,ripcloc -c,-c linux,time,6,0.225372,90123,33309313
+linux,tokei,linux,time,6,0.952959,91270,33396065
+linux,scc,linux,time,6,0.676316,91228,33464408
+linux,ripcloc,linux,time,6,0.250968,90123,33309313
+linux,tokei,linux,time,7,0.943727,91270,33396065
+linux,scc,linux,time,7,0.677318,91228,33464408
+linux,ripcloc,linux,time,7,0.226342,90123,33309313
+linux,ripcloc -c,-c linux,time,7,0.209005,90123,33309313
+linux,scc,linux,time,8,0.674601,91228,33464408
+linux,ripcloc,linux,time,8,0.228039,90123,33309313
+linux,ripcloc -c,-c linux,time,8,0.227370,90123,33309313
+linux,tokei,linux,time,8,0.934411,91270,33396065
+linux,ripcloc,linux,time,9,0.225584,90123,33309313
+linux,ripcloc -c,-c linux,time,9,0.219803,90123,33309313
+linux,tokei,linux,time,9,0.940949,91270,33396065
+linux,scc,linux,time,9,0.676322,91228,33464408
+linux,cloc,linux,memory,0,354299904,84253,31429812
+linux,cloc,linux,time,0,123.486206,84253,31429812
+linux_ch,ripcloc,--no-attribution --large linux-ch,memory,0,80109568,65049,28851688
+linux_ch,tokei,linux-ch,memory,0,272887808,65049,28856188
+linux_ch,scc,--no-complexity linux-ch,memory,0,304504832,65049,28851109
+linux_ch,ripcloc,--no-attribution --large linux-ch,memory,1,149217280,65049,28851688
+linux_ch,tokei,linux-ch,memory,1,272744448,65049,28856188
+linux_ch,scc,--no-complexity linux-ch,memory,1,339038208,65049,28851109
+linux_ch,ripcloc,--no-attribution --large linux-ch,memory,2,70807552,65049,28851688
+linux_ch,tokei,linux-ch,memory,2,276475904,65049,28856188
+linux_ch,scc,--no-complexity linux-ch,memory,2,348282880,65049,28851109
+linux_ch,ripcloc,--no-attribution --large linux-ch,time,0,0.174593,65049,28851688
+linux_ch,tokei,linux-ch,time,0,0.763064,65049,28856188
+linux_ch,scc,--no-complexity linux-ch,time,0,0.431466,65049,28851109
+linux_ch,tokei,linux-ch,time,1,0.788124,65049,28856188
+linux_ch,scc,--no-complexity linux-ch,time,1,0.439024,65049,28851109
+linux_ch,ripcloc,--no-attribution --large linux-ch,time,1,0.170749,65049,28851688
+linux_ch,scc,--no-complexity linux-ch,time,2,0.432000,65049,28851109
+linux_ch,ripcloc,--no-attribution --large linux-ch,time,2,0.172004,65049,28851688
+linux_ch,tokei,linux-ch,time,2,0.759483,65049,28856188
+linux_ch,ripcloc,--no-attribution --large linux-ch,time,3,0.171999,65049,28851688
+linux_ch,tokei,linux-ch,time,3,0.762343,65049,28856188
+linux_ch,scc,--no-complexity linux-ch,time,3,0.437668,65049,28851109
+linux_ch,tokei,linux-ch,time,4,0.770057,65049,28856188
+linux_ch,scc,--no-complexity linux-ch,time,4,0.434518,65049,28851109
+linux_ch,ripcloc,--no-attribution --large linux-ch,time,4,0.179923,65049,28851688
+linux_ch,scc,--no-complexity linux-ch,time,5,0.434054,65049,28851109
+linux_ch,ripcloc,--no-attribution --large linux-ch,time,5,0.185809,65049,28851688
+linux_ch,tokei,linux-ch,time,5,0.746921,65049,28856188
+linux_ch,ripcloc,--no-attribution --large linux-ch,time,6,0.185105,65049,28851688
+linux_ch,tokei,linux-ch,time,6,0.772063,65049,28856188
+linux_ch,scc,--no-complexity linux-ch,time,6,0.433334,65049,28851109
+linux_ch,tokei,linux-ch,time,7,0.765003,65049,28856188
+linux_ch,scc,--no-complexity linux-ch,time,7,0.432832,65049,28851109
+linux_ch,ripcloc,--no-attribution --large linux-ch,time,7,0.179794,65049,28851688
+linux_ch,scc,--no-complexity linux-ch,time,8,0.426923,65049,28851109
+linux_ch,ripcloc,--no-attribution --large linux-ch,time,8,0.173528,65049,28851688
+linux_ch,tokei,linux-ch,time,8,0.763085,65049,28856188
+linux_ch,ripcloc,--no-attribution --large linux-ch,time,9,0.186468,65049,28851688
+linux_ch,tokei,linux-ch,time,9,0.796615,65049,28856188
+linux_ch,scc,--no-complexity linux-ch,time,9,0.433675,65049,28851109
+linux_ch,cloc,linux-ch,memory,0,336449536,64876,28836815
+linux_ch,cloc,linux-ch,time,0,114.623670,64876,28836815
+rust_rs,ripcloc,--no-attribution --large rust-rs,memory,0,22089728,39802,3006997
+rust_rs,tokei,rust-rs,memory,0,73744384,39811,3034074
+rust_rs,scc,--no-complexity rust-rs,memory,0,81944576,39805,3027133
+rust_rs,ripcloc,--no-attribution --large rust-rs,memory,1,22929408,39802,3006997
+rust_rs,tokei,rust-rs,memory,1,74407936,39811,3034074
+rust_rs,scc,--no-complexity rust-rs,memory,1,81420288,39805,3027133
+rust_rs,ripcloc,--no-attribution --large rust-rs,memory,2,19836928,39802,3006997
+rust_rs,tokei,rust-rs,memory,2,72650752,39811,3034074
+rust_rs,scc,--no-complexity rust-rs,memory,2,83660800,39805,3027133
+rust_rs,ripcloc,--no-attribution --large rust-rs,time,0,0.078340,39802,3006997
+rust_rs,tokei,rust-rs,time,0,0.238106,39811,3034074
+rust_rs,scc,--no-complexity rust-rs,time,0,0.131015,39805,3027133
+rust_rs,tokei,rust-rs,time,1,0.230466,39811,3034074
+rust_rs,scc,--no-complexity rust-rs,time,1,0.133446,39805,3027133
+rust_rs,ripcloc,--no-attribution --large rust-rs,time,1,0.077387,39802,3006997
+rust_rs,scc,--no-complexity rust-rs,time,2,0.135875,39805,3027133
+rust_rs,ripcloc,--no-attribution --large rust-rs,time,2,0.078397,39802,3006997
+rust_rs,tokei,rust-rs,time,2,0.228811,39811,3034074
+rust_rs,ripcloc,--no-attribution --large rust-rs,time,3,0.073412,39802,3006997
+rust_rs,tokei,rust-rs,time,3,0.238898,39811,3034074
+rust_rs,scc,--no-complexity rust-rs,time,3,0.135365,39805,3027133
+rust_rs,tokei,rust-rs,time,4,0.228867,39811,3034074
+rust_rs,scc,--no-complexity rust-rs,time,4,0.133567,39805,3027133
+rust_rs,ripcloc,--no-attribution --large rust-rs,time,4,0.072721,39802,3006997
+rust_rs,scc,--no-complexity rust-rs,time,5,0.134397,39805,3027133
+rust_rs,ripcloc,--no-attribution --large rust-rs,time,5,0.073469,39802,3006997
+rust_rs,tokei,rust-rs,time,5,0.241133,39811,3034074
+rust_rs,ripcloc,--no-attribution --large rust-rs,time,6,0.082781,39802,3006997
+rust_rs,tokei,rust-rs,time,6,0.242905,39811,3034074
+rust_rs,scc,--no-complexity rust-rs,time,6,0.134178,39805,3027133
+rust_rs,tokei,rust-rs,time,7,0.228329,39811,3034074
+rust_rs,scc,--no-complexity rust-rs,time,7,0.137120,39805,3027133
+rust_rs,ripcloc,--no-attribution --large rust-rs,time,7,0.080388,39802,3006997
+rust_rs,scc,--no-complexity rust-rs,time,8,0.134281,39805,3027133
+rust_rs,ripcloc,--no-attribution --large rust-rs,time,8,0.077186,39802,3006997
+rust_rs,tokei,rust-rs,time,8,0.233338,39811,3034074
+rust_rs,ripcloc,--no-attribution --large rust-rs,time,9,0.076969,39802,3006997
+rust_rs,tokei,rust-rs,time,9,0.233873,39811,3034074
+rust_rs,scc,--no-complexity rust-rs,time,9,0.136316,39805,3027133
+rust_rs,cloc,rust-rs,memory,0,145625088,39225,2993794
+rust_rs,cloc,rust-rs,time,0,13.811884,39225,2993794
+react_js,ripcloc,--no-attribution --large react-js,memory,0,8007680,4449,605633
+react_js,tokei,react-js,memory,0,12898304,4449,606993
+react_js,scc,--no-complexity react-js,memory,0,32927744,4452,607682
+react_js,ripcloc,--no-attribution --large react-js,memory,1,8179712,4449,605633
+react_js,tokei,react-js,memory,1,12574720,4449,606993
+react_js,scc,--no-complexity react-js,memory,1,32866304,4452,607682
+react_js,ripcloc,--no-attribution --large react-js,memory,2,8425472,4449,605633
+react_js,tokei,react-js,memory,2,12562432,4449,606993
+react_js,scc,--no-complexity react-js,memory,2,32927744,4452,607682
+react_js,ripcloc,--no-attribution --large react-js,time,0,0.013408,4449,605633
+react_js,tokei,react-js,time,0,0.039223,4449,606993
+react_js,scc,--no-complexity react-js,time,0,0.030823,4452,607682
+react_js,tokei,react-js,time,1,0.039422,4449,606993
+react_js,scc,--no-complexity react-js,time,1,0.026764,4452,607682
+react_js,ripcloc,--no-attribution --large react-js,time,1,0.013392,4449,605633
+react_js,scc,--no-complexity react-js,time,2,0.027799,4452,607682
+react_js,ripcloc,--no-attribution --large react-js,time,2,0.013889,4449,605633
+react_js,tokei,react-js,time,2,0.039762,4449,606993
+react_js,ripcloc,--no-attribution --large react-js,time,3,0.013440,4449,605633
+react_js,tokei,react-js,time,3,0.039004,4449,606993
+react_js,scc,--no-complexity react-js,time,3,0.029736,4452,607682
+react_js,tokei,react-js,time,4,0.040044,4449,606993
+react_js,scc,--no-complexity react-js,time,4,0.027926,4452,607682
+react_js,ripcloc,--no-attribution --large react-js,time,4,0.015331,4449,605633
+react_js,scc,--no-complexity react-js,time,5,0.030066,4452,607682
+react_js,ripcloc,--no-attribution --large react-js,time,5,0.013534,4449,605633
+react_js,tokei,react-js,time,5,0.036959,4449,606993
+react_js,ripcloc,--no-attribution --large react-js,time,6,0.015050,4449,605633
+react_js,tokei,react-js,time,6,0.038600,4449,606993
+react_js,scc,--no-complexity react-js,time,6,0.028234,4452,607682
+react_js,tokei,react-js,time,7,0.039531,4449,606993
+react_js,scc,--no-complexity react-js,time,7,0.030203,4452,607682
+react_js,ripcloc,--no-attribution --large react-js,time,7,0.014419,4449,605633
+react_js,scc,--no-complexity react-js,time,8,0.030459,4452,607682
+react_js,ripcloc,--no-attribution --large react-js,time,8,0.013209,4449,605633
+react_js,tokei,react-js,time,8,0.039706,4449,606993
+react_js,ripcloc,--no-attribution --large react-js,time,9,0.013128,4449,605633
+react_js,tokei,react-js,time,9,0.039952,4449,606993
+react_js,scc,--no-complexity react-js,time,9,0.030833,4452,607682
+react_js,cloc,react-js,memory,0,36179968,4283,600127
+react_js,cloc,react-js,time,0,2.177047,4283,600127
