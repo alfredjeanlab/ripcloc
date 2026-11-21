@@ -90,10 +90,11 @@ impl Stats {
     fn text(&self, label: &str, width: usize) -> String {
         let LineCounts { blank, comment, code } = self.lines;
         let lines = self.line_count();
-        format!(
-            "{label:<width$} {:>5}  {lines:>8}  {blank:>8}  {comment:>8}  {code:>8}",
-            self.files
-        )
+        // A row with lines but no files holds the inline tests of files that count as source, so
+        // its file count does not apply rather than being zero.
+        let files =
+            if self.files == 0 && lines > 0 { "–".to_string() } else { self.files.to_string() };
+        format!("{label:<width$} {files:>5}  {lines:>8}  {blank:>8}  {comment:>8}  {code:>8}")
     }
 }
 

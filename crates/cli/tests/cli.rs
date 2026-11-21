@@ -824,6 +824,8 @@ fn inline_tests_move_lines_but_not_the_file() {
     let text = String::from_utf8(output.unwrap().stdout).unwrap();
     let total = text.lines().rev().find(|l| l.starts_with("Total ")).unwrap();
     assert_eq!(total.split_whitespace().nth(1), Some("1"), "{text}");
+    let tests = text.lines().find(|l| l.starts_with("Rust (tests)")).unwrap();
+    assert_eq!(tests.split_whitespace().nth(2), Some("–"), "{text}");
 }
 
 /// `--no-ignore` counts what ignore files leave out
