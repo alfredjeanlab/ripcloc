@@ -23,10 +23,6 @@ toml = { version = "1", default-features = false, features = ["std", "parse", "s
 tempfile = "3"
 yare = "3"
 
-[[test]]
-name = "cli"
-path = "../../tests/cli.rs"
-
 [lints]
 workspace = true
 

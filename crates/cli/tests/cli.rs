@@ -5,7 +5,7 @@
 
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic, clippy::indexing_slicing)]
 
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use std::process::Command;
 
 /// The binary, with the color settings of the environment cleared, so that output does not depend
@@ -16,8 +16,45 @@ fn ripcloc() -> Command {
     cmd
 }
 
-fn fixture(name: &str) -> PathBuf {
-    Path::new(env!("CARGO_MANIFEST_DIR")).join("../../tests/fixtures").join(name)
+/// A small Cargo project in a temporary directory: `cloc-cmd` is one crate with a source file and a
+/// test file, and `cloc-cmd-auto-detect` is a workspace of two crates.
+fn fixture(name: &str) -> tempfile::TempDir {
+    match name {
+        "cloc-cmd" => tree(&[
+            (
+                "Cargo.toml",
+                "[package]\nname = \"cloc-cmd-fixture\"\nversion = \"0.1.0\"\nedition = \"2021\"\n",
+            ),
+            (
+                "src/lib.rs",
+                "// A simple module\n\n/// Add two numbers\npub fn add(a: i32, b: i32) -> i32 {\n    a + b\n}\n\n/// Subtract two numbers\npub fn sub(a: i32, b: i32) -> i32 {\n    a - b\n}\n",
+            ),
+            (
+                "tests/basic_test.rs",
+                "// Tests for the basic module\n\n#[test]\nfn test_add() {\n    assert_eq!(2 + 2, 4);\n}\n\n#[test]\nfn test_sub() {\n    assert_eq!(4 - 2, 2);\n}\n",
+            ),
+        ]),
+        "cloc-cmd-auto-detect" => tree(&[
+            ("Cargo.toml", "[workspace]\nmembers = [\"crates/*\"]\nresolver = \"2\"\n"),
+            (
+                "crates/alpha/Cargo.toml",
+                "[package]\nname = \"alpha\"\nversion = \"0.1.0\"\nedition = \"2021\"\n",
+            ),
+            (
+                "crates/alpha/src/lib.rs",
+                "// Alpha library\n\n/// Double a value\npub fn double(x: i32) -> i32 {\n    x * 2\n}\n",
+            ),
+            (
+                "crates/beta/Cargo.toml",
+                "[package]\nname = \"beta\"\nversion = \"0.1.0\"\nedition = \"2021\"\n",
+            ),
+            (
+                "crates/beta/src/lib.rs",
+                "// Beta library\n\n/// Triple a value\npub fn triple(x: i32) -> i32 {\n    x * 3\n}\n",
+            ),
+        ]),
+        _ => panic!("no fixture named {name}"),
+    }
 }
 
 fn tree(files: &[(&str, &str)]) -> tempfile::TempDir {
@@ -49,119 +86,68 @@ fn cloc_json(dir: &Path) -> serde_json::Value {
 // Basic output
 // =============================================================================
 
-/// `ripcloc` produces a table with Language, files, lines, blank, comment, code columns
+/// The text report has a header, a row for each language and kind, a total for each kind and a
+/// grand total, each between rules, with every count of the fixture exact
 #[test]
-fn produces_table_output() {
-    let mut cmd = ripcloc();
-    cmd.current_dir(fixture("cloc-cmd"));
-    let output = cmd.output().expect("command should run");
-    assert!(output.status.success(), "expected cloc to succeed");
-    let stdout = String::from_utf8_lossy(&output.stdout);
-    // Should contain header columns
-    assert!(stdout.contains("Language"), "should have Language column");
-    assert!(stdout.contains("files"), "should have files column");
-    assert!(stdout.contains("lines"), "should have lines column");
-    assert!(stdout.contains("blank"), "should have blank column");
-    assert!(stdout.contains("comment"), "should have comment column");
-    assert!(stdout.contains("code"), "should have code column");
-}
-
-/// `ripcloc` shows source and test rows
-#[test]
-fn splits_source_and_test() {
-    let mut cmd = ripcloc();
-    cmd.current_dir(fixture("cloc-cmd"));
-    let output = cmd.output().expect("command should run");
-    let stdout = String::from_utf8_lossy(&output.stdout);
-    assert!(stdout.contains("(source)"), "should have source rows");
-    assert!(stdout.contains("(tests)"), "should have test rows");
-}
-
-/// `ripcloc` shows summary totals
-#[test]
-fn shows_totals() {
-    let mut cmd = ripcloc();
-    cmd.current_dir(fixture("cloc-cmd"));
-    let output = cmd.output().expect("command should run");
-    let stdout = String::from_utf8_lossy(&output.stdout);
-    assert!(stdout.contains("Total source"), "should have Total source");
-    assert!(stdout.contains("Total tests"), "should have Total tests");
-    assert!(stdout.contains("Total"), "should have grand Total");
-}
-
-// =============================================================================
-// JSON output
-// =============================================================================
-
-/// `ripcloc --output json` produces valid JSON
-#[test]
-fn json_output_is_valid() {
-    let mut cmd = ripcloc();
-    cmd.args(["--output", "json"]);
-    cmd.current_dir(fixture("cloc-cmd"));
-    let output = cmd.output().expect("command should run");
+fn text_report_counts_the_fixture() {
+    let dir = fixture("cloc-cmd");
+    let output = ripcloc().current_dir(dir.path()).output().unwrap();
     assert!(output.status.success());
-    let json: serde_json::Value =
-        serde_json::from_slice(&output.stdout).expect("should be valid JSON");
-    assert!(json.get("languages").is_some(), "should have languages array");
-    assert!(json.get("totals").is_some(), "should have totals object");
+    let rule = "─".repeat(72);
+    let expected = [
+        rule.as_str(),
+        "Language                  files     lines     blank   comment      code",
+        &rule,
+        "Rust (source)                 1        11         2         3         6",
+        "Rust (tests)                  1        11         2         1         8",
+        "TOML                          1         4         0         0         4",
+        &rule,
+        "Total source                  1        11         2         3         6",
+        "Total tests                   1        11         2         1         8",
+        "Total other                   1         4         0         0         4",
+        &rule,
+        "Total                         3        26         4         4        18",
+        &rule,
+    ];
+    assert_eq!(String::from_utf8(output.stdout).unwrap(), expected.join("\n") + "\n");
 }
 
-/// JSON output contains language entries with expected fields
+/// The JSON report has the same counts as the text report, and no `packages` in a project of one
+/// package
 #[test]
-fn json_has_language_entries() {
-    let mut cmd = ripcloc();
-    cmd.args(["--output", "json"]);
-    cmd.current_dir(fixture("cloc-cmd"));
-    let output = cmd.output().expect("command should run");
-    let json: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
-    let languages = json["languages"].as_array().unwrap();
-    assert!(!languages.is_empty(), "should have language entries");
-
-    // Each entry should have required fields
-    for lang in languages {
-        assert!(lang.get("language").is_some(), "should have language field");
-        assert!(lang.get("kind").is_some(), "should have kind field");
-        assert!(lang.get("files").is_some(), "should have files field");
-        assert!(lang.get("blank").is_some(), "should have blank field");
-        assert!(lang.get("comment").is_some(), "should have comment field");
-        assert!(lang.get("code").is_some(), "should have code field");
-    }
-}
-
-/// JSON totals contain source, test, and total sections
-#[test]
-fn json_totals_structure() {
-    let mut cmd = ripcloc();
-    cmd.args(["--output", "json"]);
-    cmd.current_dir(fixture("cloc-cmd"));
-    let output = cmd.output().expect("command should run");
-    let json: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
-    let totals = &json["totals"];
-    assert!(totals.get("source").is_some(), "should have source totals");
-    assert!(totals.get("test").is_some(), "should have test totals");
-    assert!(totals.get("total").is_some(), "should have grand total");
-}
-
-// =============================================================================
-// File classification
-// =============================================================================
-
-/// Source/test split matches adapter classification
-#[test]
-fn fixture_counts() {
-    let mut cmd = ripcloc();
-    cmd.args(["--output", "json"]);
-    cmd.current_dir(fixture("cloc-cmd"));
-    let output = cmd.output().expect("command should run");
-    let json: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
-    let totals = &json["totals"];
-
-    // Fixture has src/lib.rs (source) and tests/basic_test.rs (test)
-    let source_files = totals["source"]["files"].as_u64().unwrap();
-    let test_files = totals["test"]["files"].as_u64().unwrap();
-    assert!(source_files >= 1, "should have at least 1 source file");
-    assert!(test_files >= 1, "should have at least 1 test file");
+fn json_report_counts_the_fixture() {
+    let dir = fixture("cloc-cmd");
+    let stats = |files: u64, blank: u64, comment: u64, code: u64| {
+        serde_json::json!({
+            "files": files,
+            "lines": blank + comment + code,
+            "blank": blank,
+            "comment": comment,
+            "code": code,
+        })
+    };
+    let row = |language: &str, kind: &str, files, blank, comment, code| {
+        let mut row = stats(files, blank, comment, code);
+        row["language"] = language.into();
+        row["kind"] = kind.into();
+        row
+    };
+    let expected = serde_json::json!({
+        "schema": 1,
+        "attribution": true,
+        "languages": [
+            row("Rust", "source", 1, 2, 3, 6),
+            row("Rust", "test", 1, 2, 1, 8),
+            row("TOML", "other", 1, 0, 0, 4),
+        ],
+        "totals": {
+            "source": stats(1, 2, 3, 6),
+            "test": stats(1, 2, 1, 8),
+            "other": stats(1, 0, 0, 4),
+            "total": stats(3, 4, 4, 18),
+        },
+    });
+    assert_eq!(cloc_json(dir.path()), expected);
 }
 
 // =============================================================================
@@ -794,52 +780,21 @@ fn rejects_missing_paths() {
     assert!(String::from_utf8_lossy(&output.stderr).contains("does-not-exist"));
 }
 
-/// Packages are omitted from language entries when no packages configured
-#[test]
-fn json_omits_packages_when_unconfigured() {
-    let mut cmd = ripcloc();
-    cmd.args(["--output", "json"]);
-    cmd.current_dir(fixture("cloc-cmd"));
-    let output = cmd.output().expect("command should run");
-    assert!(output.status.success());
-    let json: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
-    // cloc-cmd fixture has no packages configured and is a single crate
-    assert!(json.get("packages").is_none(), "should not have top-level packages");
-    // No language entry should have packages either
-    let languages = json["languages"].as_array().unwrap();
-    for lang in languages {
-        assert!(
-            lang.get("packages").is_none(),
-            "language entry should not have packages when unconfigured"
-        );
-    }
-}
-
-/// Auto-detected Rust workspace shows package breakdown inside language entries
+/// In a workspace that is found without configuration, each language row is broken down by the
+/// packages of the workspace, and the report has no `packages` of its own
 #[test]
 fn auto_detect_workspace_packages() {
-    let mut cmd = ripcloc();
-    cmd.args(["--output", "json"]);
-    cmd.current_dir(fixture("cloc-cmd-auto-detect"));
-    let output = cmd.output().expect("command should run");
-    assert!(output.status.success());
-    let json: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
-    // No top-level packages
-    assert!(json.get("packages").is_none(), "should not have top-level packages");
-    // Packages are nested inside language entries
-    let languages = json["languages"].as_array().unwrap();
-    let pkg_names: Vec<String> = languages
-        .iter()
-        .flat_map(|l| {
-            l.get("packages")
-                .and_then(|p| p.as_array())
-                .into_iter()
-                .flatten()
-                .filter_map(|p| p.get("name").and_then(|n| n.as_str()).map(String::from))
+    let dir = fixture("cloc-cmd-auto-detect");
+    let json = cloc_json(dir.path());
+    assert!(json.get("packages").is_none(), "{json}");
+    let package = |name: &str| {
+        serde_json::json!({
+            "name": name, "files": 1, "lines": 6, "blank": 1, "comment": 2, "code": 3,
         })
-        .collect();
-    assert!(pkg_names.contains(&"alpha".to_string()), "should have alpha package");
-    assert!(pkg_names.contains(&"beta".to_string()), "should have beta package");
+    };
+    let rust = language(&json, "Rust", "source");
+    assert_eq!(rust["packages"], serde_json::json!([package("alpha"), package("beta")]));
+    assert_eq!((rust["files"].clone(), rust["code"].clone()), (2.into(), 6.into()));
 }
 
 /// A Rust source file with an inline test module is one source file, and the lines of the module,
@@ -1013,7 +968,8 @@ fn contradictory_flags_are_errors() {
         &["--deps", "--no-deps"],
     ];
     for args in pairs {
-        let output = ripcloc().args(*args).current_dir(fixture("cloc-cmd")).output().unwrap();
+        let output =
+            ripcloc().args(*args).current_dir(fixture("cloc-cmd").path()).output().unwrap();
         assert_eq!(output.status.code(), Some(2), "{args:?} should be a usage error");
     }
 }
@@ -1189,7 +1145,12 @@ fn help_lists_every_flag() {
 /// Every flag in the README's Usage block is accepted, and the hidden flags are not there.
 #[test]
 fn readme_usage_flags_exist() {
-    let path = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../README.md");
+    // The published crate holds the README beside its manifest, and the repository two levels up.
+    let manifest = Path::new(env!("CARGO_MANIFEST_DIR"));
+    let path = [manifest.join("README.md"), manifest.join("../../README.md")]
+        .into_iter()
+        .find(|p| p.exists())
+        .unwrap();
     let readme = std::fs::read_to_string(path).unwrap();
     let (_, usage) = readme.split_once("## Usage").unwrap();
     let (_, usage) = usage.split_once("```").unwrap();
@@ -1226,7 +1187,7 @@ fn prints_the_version() {
 }
 
 fn run_in_fixture(args: &[&str]) -> Vec<u8> {
-    let output = ripcloc().args(args).current_dir(fixture("cloc-cmd")).output().unwrap();
+    let output = ripcloc().args(args).current_dir(fixture("cloc-cmd").path()).output().unwrap();
     assert!(output.status.success(), "{args:?}");
     output.stdout
 }
@@ -1280,7 +1241,8 @@ fn usage_errors_name_the_flag() {
         (&["--large", "--no-large"], "--large cannot be used with --no-large"),
     ];
     for (args, message) in cases {
-        let output = ripcloc().args(*args).current_dir(fixture("cloc-cmd")).output().unwrap();
+        let output =
+            ripcloc().args(*args).current_dir(fixture("cloc-cmd").path()).output().unwrap();
         assert_eq!(output.status.code(), Some(2), "{args:?}");
         assert!(output.stdout.is_empty(), "{args:?}");
         let stderr = String::from_utf8(output.stderr).unwrap();
@@ -1293,7 +1255,7 @@ fn usage_errors_name_the_flag() {
 /// A path that cannot be read fails the run with exit status 1, which is not a usage error.
 #[test]
 fn run_errors_exit_with_one() {
-    let output = ripcloc().arg("does-not-exist").current_dir(fixture("cloc-cmd")).output();
+    let output = ripcloc().arg("does-not-exist").current_dir(fixture("cloc-cmd").path()).output();
     assert_eq!(output.unwrap().status.code(), Some(1));
 }
 
@@ -1317,7 +1279,7 @@ fn hidden_flags_still_work() {
 #[test]
 fn accepts_languages_and_deps() {
     for flag in ["--languages", "--deps", "--no-deps"] {
-        let output = ripcloc().arg(flag).current_dir(fixture("cloc-cmd")).output().unwrap();
+        let output = ripcloc().arg(flag).current_dir(fixture("cloc-cmd").path()).output().unwrap();
         assert_eq!(output.status.code(), Some(0), "{flag}");
     }
 }

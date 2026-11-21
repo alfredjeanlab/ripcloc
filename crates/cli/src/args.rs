@@ -9,8 +9,8 @@ use std::str::FromStr;
 
 use lexopt::Arg::{Long, Short, Value};
 
-/// The text of `-h` and `--help`. It leaves out `--max-depth` and `--max-file-size`, which still
-/// work but are deprecated without a warning.
+/// The text of `-h` and `--help`.
+/// It leaves out `--max-depth` and `--max-file-size`, which are deprecated.
 const HELP: &str = "\
 Counts lines of code very fast.
 
