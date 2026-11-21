@@ -15,19 +15,8 @@
 
 use std::hint::black_box;
 
-/// The modules of the binary that counting needs. They are declared inside a module whose path is
-/// `src`, so that their own submodules, such as `syntax/languages.rs`, are found where the binary
-/// finds them. The benchmark calls only part of them, so the rest would warn as unused.
-#[allow(dead_code, unused_imports)]
-#[path = "../src"]
-mod src {
-    pub mod cfg_test;
-    pub mod syntax;
-}
-
-use src::{cfg_test, syntax};
-
-use syntax::LineCounts;
+use ripcloc::cfg_test;
+use ripcloc::syntax::{self, LineCounts};
 
 /// The number of files in each input, which makes each input a few hundred kilobytes.
 const FILES: usize = 40;
