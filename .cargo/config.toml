@@ -1,0 +1,4 @@
+# Rustc run through .cargo/rustc-wrapper, which is trucker where that is installed and rustc alone where it is not.
+# `RUSTC_WRAPPER= cargo build` builds without it.
+[build]
+rustc-wrapper = ".cargo/rustc-wrapper"
